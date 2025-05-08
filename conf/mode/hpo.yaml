@@ -1,0 +1,48 @@
+name: hpo
+
+# Assumes in code epsilon_greedy is set by default, but you could also put it here.
+hpo:
+  search_space:
+    - name: agent_type
+      type: fixed
+      value: "DDQN"
+      value_type: str
+    - name: batch_size
+      type: fixed
+      value: 128
+      value_type: int
+    - name: discount_factor
+      type: fixed
+      value: 1
+    - name: learning_rate
+      type: range
+      bounds:
+        - 1e-4
+        - 1e-2
+      log_scale: True
+      value_type: float
+    - name: num_episodes
+      type: fixed
+      value: 2000
+      value_type: int
+    - name: num_eval_episodes
+      type: fixed
+      value: 25
+      value_type: int
+    - name: memory_size
+      type: range
+      bounds:
+        - 1e3
+        - 1e5
+      log_scale: True
+      value_type: int
+    - name: target_update_freq
+      type: range
+      bounds:
+        - 10
+        - 1000
+      log_scale: True
+      value_type: int
+  objective_name: "return"
+  minimize: false
+  n_trials: 20

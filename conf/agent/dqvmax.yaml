@@ -1,0 +1,15 @@
+agent_type: "DQV-Max"
+
+agent_params:
+    memory_size: 12179
+    batch_size: 128
+    learning_rate: 0.0002868376444296926
+    discount_factor: 1    # episodic environment
+    target_update_freq: 276
+    expl_policy_name: "epsilon_greedy"
+    dueling_architecture: False
+    expl_policy_params:
+      epsilon_start: 1
+      epsilon_end: 0
+    # Do not specify epsilon_decay steps as that is said to decay from epsilon_start to
+    # epsilon_end

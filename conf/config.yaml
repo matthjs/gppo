@@ -1,0 +1,19 @@
+defaults:
+  - mode: train  # Set a default mode value, it can be overridden by command-line args
+  - agent: ddqndueling
+  - _self_
+
+# Common hyperparameters (can be overridden)
+num_episodes: 2000
+num_bootstrap_samples: 1000
+num_runs: 10
+results_save_path: "../results/"
+
+
+# Hydra plugin settings
+# hydra:
+#   run:
+#     dir: outputs/${mode}
+#   sweep:
+#     dir: multirun/${mode}
+#    subdir: hpo
