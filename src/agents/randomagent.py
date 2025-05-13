@@ -2,10 +2,11 @@ from typing import Optional, Dict, Any, Tuple, Callable
 import numpy as np
 import torch
 from src.agents.agent import Agent
+from src.agents.offpolicyagent import OffPolicyAgent
 from src.util.exploration import ExplorationPolicy
 
 
-class RandomAgent(Agent):
+class RandomAgent(OffPolicyAgent):
     def __init__(self,
                  env_action_space,
                  memory_size: int = None,

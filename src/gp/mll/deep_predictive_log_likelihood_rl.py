@@ -13,4 +13,10 @@ class DeepPredictiveLogLikelihoodRL(DeepPredictiveLogLikelihood):
         deep_log_prob = deep_log_marginal.logsumexp(dim=0)
         # multiple deep_log_prob by return or an estimate of it.
 
-        return deep_log_prob.sum(-1)
+        return (kwargs["adv"] * deep_log_prob).sum(-1)
+
+    """
+    In forward call use:
+    output = self.model(states_tensor)
+    loss = -mll(output, actions_tensor, adv=estimate).mean()
+    """

@@ -1,6 +1,7 @@
 from typing import Optional
 import torch
 from src.agents.agent import Agent
+from src.agents.gpreinforceagent import GPReinforceAgent
 from src.util.environment import CatchEnv
 from src.agents.agentfactory import AgentFactory
 from src.metrics.metrictracker import MetricsTracker
@@ -42,16 +43,25 @@ def agent_env_loop(
             if learning:
                 agent.store_transition(obs, action, reward, next_obs, terminated or truncated)
                 agent.update()
-                learning_info = agent.learn()
-                if tracker and learning_info:
-                    for key, value in learning_info.items():
-                        tracker.record_metric(key, agent_id=type(agent).__name__,
-                                              episode_idx=episode, value=value)
+                if not isinstance(agent, GPReinforceAgent):
+                    learning_info = agent.learn()
+                    if tracker and learning_info:
+                        for key, value in learning_info.items():
+                            tracker.record_metric(key, agent_id=type(agent).__name__,
+                                                  episode_idx=episode, value=value)
 
             episode_return += reward
             obs = next_obs
 
             if terminated or truncated:
+                # This is akward but for now acceptable
+                if isinstance(agent, GPReinforceAgent):
+                    learning_info = agent.learn()
+                    if tracker and learning_info:
+                        for key, value in learning_info.items():
+                            tracker.record_metric(key, agent_id=type(agent).__name__,
+                                                  episode_idx=episode, value=value)
+
                 if verbose:
                     print(f"episode {episode} | reward: {episode_return}")
                 if tracker:

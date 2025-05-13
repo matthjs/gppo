@@ -9,7 +9,7 @@ class RolloutBuffer:
     Stores transitions for one batch of on-policy updates.
     """
 
-    def __init__(self, buffer_size: int, device: torch.device) -> None:
+    def __init__(self, capacity: int, device: torch.device) -> None:
         self.states = []
         self.actions = []
         self.log_probs = []
@@ -17,23 +17,30 @@ class RolloutBuffer:
         self.dones = []
         self.values = []
         self.device = device
-        self.buffer_size = buffer_size
+        self.capacity = capacity
 
     def push(
             self,
-            state: np.ndarray,
-            action: np.ndarray,
-            reward: float,
-            done: bool,
-            log_prob: float,
-            value: float
+            state,
+            action,
+            reward,
+            done,
+            log_prob=None,
+            value=None
     ) -> None:
-        self.states.append(torch.tensor(state, dtype=torch.float32, device=self.device))
-        self.actions.append(torch.tensor(action, dtype=torch.long, device=self.device))
-        self.rewards.append(torch.tensor(reward, dtype=torch.float32, device=self.device))
-        self.dones.append(torch.tensor(done, dtype=torch.float32, device=self.device))
-        self.log_probs.append(torch.tensor(log_prob, dtype=torch.float32, device=self.device))
-        self.values.append(torch.tensor(value, dtype=torch.float32, device=self.device))
+        def ensure_tensor(x, dtype, device):
+            if isinstance(x, torch.Tensor):
+                return x.to(dtype=dtype, device=device)
+            return torch.tensor(x, dtype=dtype, device=device)
+
+        self.states.append(ensure_tensor(state, torch.float32, self.device))
+        self.actions.append(ensure_tensor(action, torch.long, self.device))
+        self.rewards.append(ensure_tensor(reward, torch.float32, self.device))
+        self.dones.append(ensure_tensor(done, torch.float32, self.device))
+        if log_prob:
+            self.log_probs.append(ensure_tensor(log_prob, torch.float32, self.device))
+        if value:
+            self.values.append(ensure_tensor(value, torch.float32, self.device))
 
     def get(self, batch_size: int) -> Tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -73,3 +80,9 @@ class RolloutBuffer:
         self.dones = []
         self.log_probs = []
         self.values = []
+
+    def __len__(self):
+        """
+        :return: Number of transitions currently stored.
+        """
+        return len(self.states)

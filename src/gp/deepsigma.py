@@ -11,6 +11,7 @@ from pandas import Categorical
 from torch import Tensor
 
 from src.gp.deepgplayers import DSPPHiddenLayer
+from src.gp.gpbase import GPytorchModel
 
 
 class DSPPModel(DSPP, GPytorchModel):

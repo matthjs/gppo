@@ -2,11 +2,12 @@ from typing import Tuple, Optional, Dict, Any
 import torch
 from torch import nn, optim
 from src.agents.agent import Agent
+from src.agents.offpolicyagent import OffPolicyAgent
 from src.util.exploration import make_policy
 from src.util.network import ConvNetEstimator, DuelingConvNetEstimator
 
 
-class DQNAgent(Agent):
+class DQNAgent(OffPolicyAgent):
     def __init__(self,
                  memory_size: int,
                  state_dimensions: Tuple[int, int, int],
