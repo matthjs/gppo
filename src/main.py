@@ -1,6 +1,9 @@
 import os
 import hydra
+import gymnasium as gym
 from omegaconf import DictConfig, OmegaConf
+
+from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import create_rl_agent_catch, eval_rl_agent, train_rl_agent
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer
 from src.metrics.metrictracker import MetricsTracker
@@ -23,9 +26,13 @@ def main(cfg: DictConfig):
 
         if cfg.mode.train:
             for _ in range(cfg.num_runs):
-                agent = create_agent_for_catch_env(cfg.agent.agent_type, cfg.num_episodes,
-                                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
-                agent_env_loop(agent, cfg.num_episodes, tracker=tracker, learning=True, verbose=True)
+                env = gym.make("InvertedPendulum-v5")
+                agent = AgentFactory.create_agent(cfg.agent.agent_type, env,
+                                                  OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
+
+                # agent = create_agent_for_catch_env(cfg.agent.agent_type, cfg.num_episodes,
+                #                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
+                agent_env_loop(agent, cfg.num_episodes, tracker=tracker, learning=True, env=env, verbose=True)
 
         tracker.plot_all_metrics(num_episodes=cfg.num_episodes)
         # After plotting, get final metrics

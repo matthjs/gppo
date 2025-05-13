@@ -25,11 +25,11 @@ class GPReinforceAgent(OnPolicyAgent):
 
         # Use CNN feature extractor if image data
         self.policy = DSPPModel(
-            input_dim=state_dimensions,
+            input_dim=state_dimensions[0],
             hidden_layers_config=[
                 {"output_dims": 4, "mean_type": "linear"},
                 {"output_dims": 4, "mean_type": "linear"},
-                {"output_dims": action_dimensions, "mean_type": "constant"},
+                {"output_dims": action_dimensions[0], "mean_type": "constant"},
             ]
         ).to(self.device)
         self.num_epochs = num_epochs
@@ -41,10 +41,13 @@ class GPReinforceAgent(OnPolicyAgent):
             observation: np.ndarray
     ) -> Union[int, np.ndarray]:
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
+            # Could also use posterior() method
             state_tensor = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
             pred = self.policy(state_tensor)
             action_dist = self.policy.likelihood(pred)
-            action = action_dist.sample().cpu().numpy()
+            action_t = action_dist.sample()
+            action_t_ = action_t.mean(0).mean(0).squeeze(0)    # Double check this later
+            action = action_t_.cpu().numpy()
 
         return action
 
@@ -70,8 +73,8 @@ class GPReinforceAgent(OnPolicyAgent):
         return rewards_to_go
 
     def learn(self) -> Dict[str, Any]:
-        # if len(self.rollout_buffer) < self.batch_size:
-        #    return {}
+        if len(self.rollout_buffer) < self.batch_size:
+            return {}
 
         total_loss = 0.0
 
@@ -81,7 +84,7 @@ class GPReinforceAgent(OnPolicyAgent):
 
                 # Compute rewards-to-go
                 rewards_to_go = self._compute_rewards_to_go(rewards.cpu().numpy())
-                rewards_to_go = torch.tensor(rewards_to_go, dtype=torch.float32, device=self.device)
+                rewards_to_go = torch.tensor(rewards_to_go, dtype=torch.float32, device=self.device).unsqueeze(-1)
                 # Forward pass to get the predicted distribution of actions
                 pred = self.policy(states)
                 loss = -self.mll(pred, actions, adv=rewards_to_go).mean()

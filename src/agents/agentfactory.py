@@ -1,4 +1,8 @@
+from typing import Union
+
 import gymnasium as gym
+import torch
+
 from src.agents.agent import Agent
 from src.agents.ddqnagent import DDQNAgent
 from src.agents.dqnagent import DQNAgent
@@ -11,13 +15,25 @@ from src.agents.randomagent import RandomAgent
 class AgentFactory:
     @staticmethod
     def create_agent(agent_type: str,
-                     env: gym.Env,
-                     agent_params: dict) -> Agent:
+                     env: Union[gym.Env, str],
+                     agent_params: dict,
+                     device=None) -> Agent:
         """
         Create an agent of agent_type with agent_params.
         """
+        if isinstance(env, str):
+            env = gym.make(env)   # Env params?
+
         obs_space = env.observation_space
         action_space = env.action_space
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "")
+
+        agent_params.update({
+            "state_dimensions": obs_space.shape,
+            "action_dimensions": action_space.shape,
+            "device": device,
+        })
 
         if agent_type == "DQN":
             # This looks like syntactic nonsense but basically we want to overwrite the class

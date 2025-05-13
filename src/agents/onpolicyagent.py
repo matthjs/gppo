@@ -22,7 +22,7 @@ class OnPolicyAgent(Agent, ABC):
         self.memory_size = memory_size
         self.rollout_buffer = RolloutBuffer(capacity=self.memory_size, device=device)
         self.batch_size = batch_size
-        self.learning_rate = learning_rate,
+        self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.device = device
 

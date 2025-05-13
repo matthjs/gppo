@@ -58,8 +58,10 @@ class RolloutBuffer:
         actions = torch.stack(self.actions)
         rewards = torch.stack(self.rewards)
         dones = torch.stack(self.dones)
-        log_probs = torch.stack(self.log_probs)
-        values = torch.stack(self.values)
+        if self.log_probs:
+            log_probs = torch.stack(self.log_probs)
+        if self.values:
+            values = torch.stack(self.values)
 
         # Yield mini-batches in the original order
         for start in range(0, len(states), batch_size):
@@ -69,8 +71,8 @@ class RolloutBuffer:
                 actions[start:end],
                 rewards[start:end],
                 dones[start:end],
-                log_probs[start:end],
-                values[start:end]
+                log_probs[start:end] if self.log_probs else None,
+                values[start:end] if self.values else None
             )
 
     def clear(self) -> None:
