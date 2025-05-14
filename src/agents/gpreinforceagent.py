@@ -27,9 +27,9 @@ class GPReinforceAgent(OnPolicyAgent):
         self.policy = DSPPModel(
             input_dim=state_dimensions[0],
             hidden_layers_config=[
-                {"output_dims": 4, "mean_type": "linear"},
-                {"output_dims": 4, "mean_type": "linear"},
-                {"output_dims": action_dimensions[0], "mean_type": "constant"},
+                # {"output_dims": 2, "mean_type": "linear"},
+                #{"output_dims": 2, "mean_type": "linear"},
+                {"output_dims": None, "mean_type": "constant"},
             ]
         ).to(self.device)
         self.num_epochs = num_epochs
@@ -46,7 +46,7 @@ class GPReinforceAgent(OnPolicyAgent):
             pred = self.policy(state_tensor)
             action_dist = self.policy.likelihood(pred)
             action_t = action_dist.sample()
-            action_t_ = action_t.mean(0).mean(0).squeeze(0)    # Double check this later
+            action_t_ = action_t.mean(dim=(0))
             action = action_t_.cpu().numpy()
 
         return action
@@ -79,22 +79,27 @@ class GPReinforceAgent(OnPolicyAgent):
         total_loss = 0.0
 
         for epoch in range(self.num_epochs):
-            for minibatch in self.rollout_buffer.get(batch_size=self.batch_size):
+            for minibatch in self.rollout_buffer.get(batch_size=len(self.rollout_buffer)):
+
                 states, actions, rewards, dones, _, _ = minibatch
+                # Conditionally squeeze
+                if actions.dim() > 1 and actions.shape[1] == 1:
+                    actions = actions.squeeze(1)
 
                 # Compute rewards-to-go
                 rewards_to_go = self._compute_rewards_to_go(rewards.cpu().numpy())
                 rewards_to_go = torch.tensor(rewards_to_go, dtype=torch.float32, device=self.device).unsqueeze(-1)
                 # Forward pass to get the predicted distribution of actions
                 pred = self.policy(states)
-                loss = -self.mll(pred, actions, adv=rewards_to_go).mean()
+                mll = DeepPredictiveLogLikelihoodRL(self.policy.likelihood, self.policy, len(self.rollout_buffer))
+                loss = -mll(pred, actions, adv=rewards_to_go).mean() # -self.mll(pred, actions, adv=rewards_to_go).mean()
 
                 loss.backward()
                 self.optimizer.step()
 
                 total_loss += loss.item()
 
-
+        self.rollout_buffer.clear()
         return {"loss": total_loss}
 
 

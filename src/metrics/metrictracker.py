@@ -252,7 +252,7 @@ class MetricsTracker:
                         )
 
             # Reference line at max return = 1
-            ax.axhline(y=1, color='black', linestyle='--', linewidth=2, alpha=0.7, label="Max Return")
+            # ax.axhline(y=1, color='black', linestyle='--', linewidth=2, alpha=0.7, label="Max Return")
 
             # Labels, title, legend, and styling
             ax.set_title(

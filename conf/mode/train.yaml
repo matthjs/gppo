@@ -1,5 +1,5 @@
 name: train
 
 train: True
-import_metrics: False
-export_metrics: False
+import_metrics: True
+export_metrics: True

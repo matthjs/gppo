@@ -20,7 +20,7 @@ class DSPPModel(DSPP, GPytorchModel):
                  input_dim: int,
                  hidden_layers_config: List[Dict[str, Any]],
                  Q: int = 8,
-                 num_inducing_points: int = 128,
+                 num_inducing_points: int = 256,
                  input_transform: Any = None,
                  outcome_transform: Any = None,
                  classification: bool = False,
