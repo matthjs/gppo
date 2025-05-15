@@ -5,7 +5,7 @@ import torch
 
 class RolloutBuffer:
     """
-    Rollout buffer for PPO or similar on-policy algorithms.
+    Rollout buffer for PPO or similar on-policy algoritorchms.
     Stores transitions for one batch of on-policy updates.
     """
 
@@ -16,75 +16,81 @@ class RolloutBuffer:
         self.rewards = []
         self.dones = []
         self.values = []
+        self.returns = []
+        self.advantages = []
         self.device = device
         self.capacity = capacity
 
     def push(
-            self,
-            state,
-            action,
-            reward,
-            done,
-            log_prob=None,
-            value=None
+        self,
+        state,
+        action,
+        reward,
+        done,
+        log_prob=None,
+        value=None,
     ) -> None:
         def ensure_tensor(x, dtype, device):
             if isinstance(x, torch.Tensor):
                 return x.to(dtype=dtype, device=device)
             return torch.tensor(x, dtype=dtype, device=device)
 
-        self.states.append(ensure_tensor(state, torch.float32, self.device))
-        self.actions.append(ensure_tensor(action, torch.long, self.device))
-        self.rewards.append(ensure_tensor(reward, torch.float32, self.device))
-        self.dones.append(ensure_tensor(done, torch.float32, self.device))
-        if log_prob:
+        if self.states:
+            self.states.append(ensure_tensor(state, torch.float32, self.device))
+        if self.actions:
+            self.actions.append(ensure_tensor(action, torch.float32, self.device))
+        if self.rewards:
+            self.rewards.append(ensure_tensor(reward, torch.float32, self.device))
+        if self.dones:
+            self.dones.append(ensure_tensor(done, torch.float32, self.device))
+        if log_prob is not None:
             self.log_probs.append(ensure_tensor(log_prob, torch.float32, self.device))
-        if value:
+        if value is not None:
             self.values.append(ensure_tensor(value, torch.float32, self.device))
 
-    def get(self, batch_size: int) -> Tuple[
-        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Returns mini-batches of transitions as tensors, without shuffling the buffer.
-        Typically used after computing GAE and returns.
-        Usage:
-            for epoch in range(epochs):
-                for minibatch in buffer.get(batch_size=64):  # Sample minibatches in order
-                    states, actions, rewards, dones, log_probs, values = minibatch
-                    # Do the policy update with the minibatch here
-        :param batch_size: The number of samples to return per batch.
-        """
+    def compute_returns_and_advantages(
+        self,
+        last_value: torch.Tensor,
+        gamma: float,
+        gae_lambda: float,
+    ) -> None:
+        # Generalized advantage estimation
+        self.advantages = []
+        gae = 0
+        values = self.values + [last_value]
+        for step in reversed(range(len(self.rewards))):
+            delta = self.rewards[step] + gamma * values[step + 1] * (1 - self.dones[step]) - values[step]
+            gae = delta + gamma * gae_lambda * (1 - self.dones[step]) * gae
+            self.advantages.insert(0, gae)
+        # compute returns
+        self.returns = [adv + val for adv, val in zip(self.advantages, self.values)]
+
+    def get(self, batch_size: int) -> Tuple:
         states = torch.stack(self.states)
         actions = torch.stack(self.actions)
-        rewards = torch.stack(self.rewards)
-        dones = torch.stack(self.dones)
-        if self.log_probs:
-            log_probs = torch.stack(self.log_probs)
-        if self.values:
-            values = torch.stack(self.values)
-
-        # Yield mini-batches in the original order
+        old_log_probs = torch.stack(self.log_probs)
+        returns = torch.stack(self.returns)
+        advantages = torch.stack(self.advantages)
+        # yield minibatches
         for start in range(0, len(states), batch_size):
-            end = min(start + batch_size, len(states))
+            end = start + batch_size
             yield (
                 states[start:end],
                 actions[start:end],
-                rewards[start:end],
-                dones[start:end],
-                log_probs[start:end] if self.log_probs else None,
-                values[start:end] if self.values else None
+                old_log_probs[start:end],
+                returns[start:end],
+                advantages[start:end],
             )
 
     def clear(self) -> None:
-        self.states = []
-        self.actions = []
-        self.rewards = []
-        self.dones = []
-        self.log_probs = []
-        self.values = []
+        self.states.clear()
+        self.actions.clear()
+        self.log_probs.clear()
+        self.rewards.clear()
+        self.dones.clear()
+        self.values.clear()
+        self.returns.clear()
+        self.advantages.clear()
 
-    def __len__(self):
-        """
-        :return: Number of transitions currently stored.
-        """
+    def __len__(self) -> int:
         return len(self.states)
