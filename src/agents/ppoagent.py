@@ -189,7 +189,7 @@ class PPOAgent(OnPolicyAgent):
         for _ in range(self.n_epochs):
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
                 dist, values, _ = self.policy(states)
-                log_probs = dist.log_prob(actions)# .sum(-1)
+                log_probs = dist.log_prob(actions)
                 entropy = dist.entropy().mean()  # Sum over actions before mean
 
                 # Policy loss
