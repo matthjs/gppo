@@ -70,7 +70,7 @@ class DSPPModel(DSPP, GPytorchModel):
         self.likelihood = SoftmaxLikelihood(num_classes=num_classes, num_features=self.out_dim, mixing_weights=False) \
             if classification else GaussianLikelihood()
         self._num_outputs = 1
-        self.double()
+        # self.double()
         self.intermediate_outputs = None
 
         # Initialize transforms
