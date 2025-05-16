@@ -11,9 +11,7 @@ from src.gp.deepsigma import DSPPModel
 class ActorCriticDGP(DSPPModel):
     def __init__(
         self,
-        action_dim: int,
-        value_dim: int = 1,
-        policy_hidden_config: List[Dict] = None,
+        policy_hidden_config: List[Dict],
         value_hidden_config: List[Dict] = None,
         **kwargs
     ):
@@ -35,9 +33,6 @@ class ActorCriticDGP(DSPPModel):
         # Policy head configuration
         self.policy_head = torch.nn.ModuleList()
         last_dim = self.out_dim
-        policy_hidden_config = policy_hidden_config or [
-            {'output_dims': action_dim, 'mean_type': 'constant', 'num_inducing': self.num_inducing_points}
-        ]
 
         # Build policy head layers
         for layer_config in policy_hidden_config:
