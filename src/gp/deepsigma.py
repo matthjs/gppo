@@ -47,6 +47,7 @@ class DSPPModel(DSPP, GPytorchModel):
         input_dims = input_dim
         self.layers = []
         self.Q = Q
+        self.num_inducing_points = num_inducing_points
 
         hidden_layers_config = json.loads(hidden_layers_config) if isinstance(hidden_layers_config, str) else \
             hidden_layers_config
