@@ -5,8 +5,9 @@ import torch
 
 class RolloutBuffer:
     """
-    Rollout buffer for PPO or similar on-policy algoritorchms.
+    Rollout buffer for PPO or similar on-policy algorithms.
     Stores transitions for one batch of on-policy updates.
+    Provides support for computing Generalized Advantage Estimate (GAE).
     """
 
     def __init__(self, capacity: int, device: torch.device) -> None:
@@ -35,13 +36,13 @@ class RolloutBuffer:
                 return x.to(dtype=dtype, device=device)
             return torch.tensor(x, dtype=dtype, device=device)
 
-        if self.states:
+        if state is not None:
             self.states.append(ensure_tensor(state, torch.float32, self.device))
-        if self.actions:
+        if action is not None:
             self.actions.append(ensure_tensor(action, torch.float32, self.device))
-        if self.rewards:
+        if reward is not None:
             self.rewards.append(ensure_tensor(reward, torch.float32, self.device))
-        if self.dones:
+        if done is not None:
             self.dones.append(ensure_tensor(done, torch.float32, self.device))
         if log_prob is not None:
             self.log_probs.append(ensure_tensor(log_prob, torch.float32, self.device))
@@ -57,13 +58,19 @@ class RolloutBuffer:
         # Generalized advantage estimation
         self.advantages = []
         gae = 0
-        values = self.values + [last_value]
+        values = [v.detach() for v in self.values] + [last_value.detach()]
+        # values = self.values
         for step in reversed(range(len(self.rewards))):
             delta = self.rewards[step] + gamma * values[step + 1] * (1 - self.dones[step]) - values[step]
             gae = delta + gamma * gae_lambda * (1 - self.dones[step]) * gae
             self.advantages.insert(0, gae)
-        # compute returns
-        self.returns = [adv + val for adv, val in zip(self.advantages, self.values)]
+
+        # Normalize advantages
+        advantages_tensor = torch.stack(self.advantages)
+        advantages_tensor = (advantages_tensor - advantages_tensor.mean()) / (advantages_tensor.std() + 1e-8)
+        self.advantages = list(advantages_tensor)
+        # compute returns (TD_target)
+        self.returns = [adv.detach() + val.detach() for adv, val in zip(self.advantages, self.values)]
 
     def get(self, batch_size: int) -> Tuple:
         states = torch.stack(self.states)
