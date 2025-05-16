@@ -18,7 +18,7 @@ class ActorCritic(nn.Module):
             self,
             input_dim: int,
             action_dim: int,
-            hidden_sizes: List[int] = [128, 128, 64, 64],
+            hidden_sizes: List[int] = [64, 64],
     ):
         super().__init__()
         # build MLP
@@ -188,9 +188,9 @@ class PPOAgent(OnPolicyAgent):
         losses = []
         for _ in range(self.n_epochs):
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
-                dist, values, _ = self.policy(states.view(states.size(0), -1))
-                log_probs = dist.log_prob(actions).sum(-1)
-                entropy = dist.entropy().mean()
+                dist, values, _ = self.policy(states)
+                log_probs = dist.log_prob(actions)# .sum(-1)
+                entropy = dist.entropy().mean()  # Sum over actions before mean
 
                 # Policy loss
                 ratio = torch.exp(log_probs - old_log_probs)  # Note: Subtraction is division in log space.
