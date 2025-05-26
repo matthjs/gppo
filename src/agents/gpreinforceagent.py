@@ -6,7 +6,7 @@ import torch
 
 from src.agents.onpolicyagent import OnPolicyAgent
 from src.gp.deepsigma import DSPPModel
-from src.gp.mll.deep_predictive_log_likelihood_rl import DeepPredictiveLogLikelihoodRL
+# from src.gp.mll.deep_predictive_log_likelihood_rl import DeepPredictiveLogLikelihoodRL
 
 
 class GPReinforceAgent(OnPolicyAgent):
@@ -34,7 +34,7 @@ class GPReinforceAgent(OnPolicyAgent):
         ).to(self.device)
         self.num_epochs = num_epochs
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.learning_rate)
-        self.mll = DeepPredictiveLogLikelihoodRL(self.policy.likelihood, self.policy, self.batch_size)
+        # self.mll = DeepPredictiveLogLikelihoodRL(self.policy.likelihood, self.policy, self.batch_size)
 
     def choose_action(
             self,
@@ -91,7 +91,7 @@ class GPReinforceAgent(OnPolicyAgent):
                 rewards_to_go = torch.tensor(rewards_to_go, dtype=torch.float32, device=self.device).unsqueeze(-1)
                 # Forward pass to get the predicted distribution of actions
                 pred = self.policy(states)
-                mll = DeepPredictiveLogLikelihoodRL(self.policy.likelihood, self.policy, len(self.rollout_buffer))
+                # mll = DeepPredictiveLogLikelihoodRL(self.policy.likelihood, self.policy, len(self.rollout_buffer))
                 loss = -mll(pred, actions, adv=rewards_to_go).mean() # -self.mll(pred, actions, adv=rewards_to_go).mean()
 
                 loss.backward()

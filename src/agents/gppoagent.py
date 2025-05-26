@@ -6,7 +6,13 @@ import torch
 from src.agents.onpolicyagent import OnPolicyAgent
 from src.agents.ppoagent import PPOAgent
 from src.gp.acdeepsigma import ActorCriticDGP
-
+from src.gp.mll.actorcriticmll import ActorCriticMLL
+from src.agents.onpolicyagent import OnPolicyAgent
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.distributions import Normal, Categorical
+from typing import Dict, Any, Tuple, Optional, List
 
 class GPPOAgent(OnPolicyAgent):
     def __init__(
@@ -44,6 +50,7 @@ class GPPOAgent(OnPolicyAgent):
         )
 
         self.policy = ActorCriticDGP(
+            input_dim=state_dimensions[-1],
             hidden_layers_config=hidden_layers_config,
             policy_hidden_config=policy_hidden_config,
             value_hidden_config=value_hidden_config,
@@ -60,6 +67,11 @@ class GPPOAgent(OnPolicyAgent):
         self.vf_coef = vf_coef
         self.max_grad_norm = max_grad_norm
 
+        self.objective = ActorCriticMLL(self.policy,
+                                        self.policy.likelihood,
+                                        num_data=self.batch_size,
+                                        clip_range=self.clip_range)
+
         self.last_log_prob = None
         self.last_value = None
         self.next_state = None
@@ -72,7 +84,9 @@ class GPPOAgent(OnPolicyAgent):
         action_dist, value_dist = self.policy(state)
         # NOTE: Do something smarter here with action selection
         action = action_dist.sample()
-        log_prob = action_dist.log_prob(action)
+        log_prob = action_dist.log_prob(action)    # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
+
+
         self.last_log_prob = log_prob
         self.last_value = value_dist.mean.mean(0)
         return action.mean(0).cpu().numpy().squeeze(0)
@@ -94,3 +108,41 @@ class GPPOAgent(OnPolicyAgent):
             self.last_log_prob.detach(),
             self.last_value.detach(),
         )
+
+    def learn(self) -> Dict[str, Any]:
+        """
+        Usage: run the learn() method at every timestep in the environment,
+        it will only update the agent once the rollout-buffer has been filled.
+        """
+        if len(self.rollout_buffer) < self.batch_size:
+            return {}
+
+        # Compute last value (this is akward can this be changed?)
+        last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        with torch.no_grad():
+            _, value_dist = self.policy(last_state)
+            last_value = value_dist.mean.mean(0)
+
+        # compute returns and advantages
+        # implementation choice: \hat{R} and \hat{A} are computed at this stage instead of
+        # one at a time at every step.
+        self.rollout_buffer.compute_returns_and_advantages(
+            last_value.detach(),
+            self.discount_factor,
+            self.gae_lambda
+        )
+
+        # Perform update rule
+        info: Dict[str, Any] = {}
+        losses = []
+        for _ in range(self.n_epochs):
+            for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
+                loss = self.objective(states, actions, advantages, returns, old_log_probs)
+                losses.append(loss)
+                self.optimizer.zero_grad()
+                nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                self.optimizer.step()
+
+        self.rollout_buffer.clear()
+        info["loss"] = float(np.mean(losses))
+        return info

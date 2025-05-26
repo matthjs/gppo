@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 
 import torch
 from gpytorch.distributions import MultivariateNormal
@@ -11,6 +11,10 @@ from src.gp.deepsigma import DSPPModel
 class ActorCriticDGP(DSPPModel):
     def __init__(
         self,
+        input_dim: int,
+        hidden_layers_config: List[Dict[str, Any]],
+        Q,
+        num_inducing_points,
         policy_hidden_config: List[Dict],
         value_hidden_config: List[Dict] = None,
         **kwargs
@@ -23,7 +27,7 @@ class ActorCriticDGP(DSPPModel):
         :param policy_hidden_config: Configuration for policy head layers
         :param value_hidden_config: Configuration for value head layers
         """
-        super().__init__(**kwargs)
+        super().__init__(input_dim, hidden_layers_config, Q, num_inducing_points, **kwargs)
 
         # Postcondition self.layers() has base GP
         # out_dim got the output dimensions of latent var

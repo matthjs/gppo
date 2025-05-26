@@ -2,7 +2,6 @@ import os
 import hydra
 import gymnasium as gym
 from omegaconf import DictConfig, OmegaConf
-
 from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import create_rl_agent_catch, eval_rl_agent, train_rl_agent
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer

@@ -1,12 +1,12 @@
 defaults:
   - mode: train  # Set a default mode value, it can be overridden by command-line args
-  - agent: ppo
+  - agent: random
   - _self_
 
 # Common hyperparameters (can be overridden)
-num_episodes: 10000
+num_episodes: 300
 num_bootstrap_samples: 100
-num_runs: 1
+num_runs: 3
 results_save_path: "../results/"
 
 

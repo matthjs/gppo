@@ -8,6 +8,7 @@ from src.agents.ddqnagent import DDQNAgent
 from src.agents.dqnagent import DQNAgent
 from src.agents.dqvagent import DQVAgent
 from src.agents.dqvmaxagent import DQVMaxAgent
+from src.agents.gppoagent import GPPOAgent
 from src.agents.gpreinforceagent import GPReinforceAgent
 from src.agents.randomagent import RandomAgent
 from src.agents.reinforceagent import ReinforceAgent
@@ -52,11 +53,13 @@ class AgentFactory:
             return DQVMaxAgent(**agent_params) if not agent_params['dueling_architecture'] else \
                 type("DQVMaxAgent", (DQVMaxAgent,), {})(**agent_params)
         elif agent_type == "GPReinforce":
-            return GPReinforceAgent(**agent_params)
+            return GPReinforceAgent(**agent_params)    # I don't think this runs anymore due to outdated interface somehwere.
         elif agent_type == "Reinforce":
             return ReinforceAgent(**agent_params)
         elif agent_type == "PPO":
             return PPOAgent(**agent_params)
+        elif agent_type == "GPPO":
+            return GPPOAgent(**agent_params)
         elif agent_type == "RANDOM":
             return RandomAgent(action_space)
 

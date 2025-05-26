@@ -150,6 +150,7 @@ class PPOAgent(OnPolicyAgent):
 
     def _early_kl_stop(self, log_prob, old_log_prob) -> bool:
         """
+        NOTE TO SELF: THIS IS NOT FINISHED SO DO NOT USE.
         Determines whether optimization loop should stop early using
         approximate form of reverse KL divergence.
         """
