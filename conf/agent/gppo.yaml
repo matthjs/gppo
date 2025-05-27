@@ -20,7 +20,7 @@ agent_params:
         - output_dims: 4
           mean_type: "linear"
     policy_hidden_config:
-        - output_dims: 1
+        - output_dims: null
           mean_type: "constant"
     value_hidden_config:
         - output_dims: null

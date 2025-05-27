@@ -14,6 +14,7 @@ import torch.nn as nn
 from torch.distributions import Normal, Categorical
 from typing import Dict, Any, Tuple, Optional, List
 
+
 class GPPOAgent(OnPolicyAgent):
     def __init__(
             self,
@@ -84,12 +85,15 @@ class GPPOAgent(OnPolicyAgent):
         action_dist, value_dist = self.policy(state)
         # NOTE: Do something smarter here with action selection
         action = action_dist.sample()
-        log_prob = action_dist.log_prob(action)    # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
 
+        # log_prob calculation (specific to DSPPs)
+        base_log_marginal = self.policy.likelihood.log_marginal(action, action_dist)
+        deep_log_marginal = self.policy.quad_weights.unsqueeze(-1) + base_log_marginal
+        log_prob = deep_log_marginal.logsumexp(dim=0).sum(-1) # action_dist.log_prob(action)  # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
 
         self.last_log_prob = log_prob
         self.last_value = value_dist.mean.mean(0)
-        return action.mean(0).cpu().numpy().squeeze(0)
+        return action.mean(0).cpu().numpy()# .squeeze(0)
 
     def store_transition(
             self,
@@ -138,8 +142,9 @@ class GPPOAgent(OnPolicyAgent):
         for _ in range(self.n_epochs):
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
                 loss = self.objective(states, actions, advantages, returns, old_log_probs)
-                losses.append(loss)
+                losses.append(loss.item())
                 self.optimizer.zero_grad()
+                loss.backward()
                 nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 

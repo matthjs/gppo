@@ -35,12 +35,12 @@ class ActorCriticMLL:
         policy_dist, value_dist = self.model(states)
         loss = -self.mll_policy(
             policy_dist,
-            actions,
-            adv=advantages,
+            actions.squeeze(-1),
+            adv=advantages.squeeze(-1),
             old_log_probs=old_log_probs
         ).mean() + -self.mll_value(
             value_dist,
-            returns
+            returns.squeeze(-1)
         ).mean()
 
         return loss

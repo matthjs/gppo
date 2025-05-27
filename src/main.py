@@ -43,12 +43,12 @@ def main(cfg: DictConfig):
 
         if cfg.mode.export_metrics:
             tracker.export_metrics(str(metrics_path))
-
     elif cfg.mode.name == 'hpo':
         bo = BayesianOptimizer(
             search_space=OmegaConf.to_container(cfg.mode.hpo.search_space, resolve=True),
             model_factory=create_rl_agent_catch,
             train_fn=train_rl_agent,
+
             eval_fn=eval_rl_agent,
             objective_name=cfg.mode.hpo.objective_name,
             minimize=cfg.mode.hpo.minimize,

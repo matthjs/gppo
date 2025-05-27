@@ -1,12 +1,12 @@
 defaults:
   - mode: train  # Set a default mode value, it can be overridden by command-line args
-  - agent: random
+  - agent: gppo
   - _self_
 
 # Common hyperparameters (can be overridden)
-num_episodes: 300
+num_episodes: 2500
 num_bootstrap_samples: 100
-num_runs: 3
+num_runs: 1
 results_save_path: "../results/"
 
 
