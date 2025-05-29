@@ -97,7 +97,7 @@ class GPPOAgent(OnPolicyAgent):
         log_prob = deep_log_marginal.logsumexp(dim=0).sum(-1) # action_dist.log_prob(action)  # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
 
         self.last_log_prob = log_prob
-        self.last_value = value_dist.mean.mean(0)
+        self.last_value = value_dist.sample().mean(0)   # value_dist.mean.mean(0)   mean or sample?
 
         action_t = action.mean(0)
         if action_t.dim() > 1:

@@ -4,7 +4,7 @@ defaults:
   - _self_
 
 # Common hyperparameters (can be overridden)
-num_episodes: 2500
+num_episodes: 1000
 num_bootstrap_samples: 100
 num_runs: 1
 results_save_path: "./results/"
