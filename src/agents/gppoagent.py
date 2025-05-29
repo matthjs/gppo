@@ -24,6 +24,7 @@ class GPPOAgent(OnPolicyAgent):
             hidden_layers_config: List[Dict],
             policy_hidden_config: List[Dict],
             value_hidden_config: List[Dict],
+            beta: float = 1.0,
             num_inducing_points: int = 128,
             num_quad_sites: int = 8,
             memory_size: int = 2048,
@@ -74,7 +75,8 @@ class GPPOAgent(OnPolicyAgent):
                                         num_data=self.batch_size,
                                         clip_range=self.clip_range,
                                         vf_coef=self.vf_coef,
-                                        ent_coef=self.ent_coef)
+                                        ent_coef=self.ent_coef,
+                                        beta=beta)
 
         self.last_log_prob = None
         self.last_value = None

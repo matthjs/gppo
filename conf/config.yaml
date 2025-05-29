@@ -1,5 +1,5 @@
 defaults:
-  - mode: hpo_gppo  # Set a default mode value, it can be overridden by command-line args
+  - mode: train  # Set a default mode value, it can be overridden by command-line args
   - agent: gppo
   - _self_
 

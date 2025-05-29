@@ -5,8 +5,8 @@ import torch
 
 
 class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
-    def __init__(self, likelihood, model, num_data, clip_range):
-        super().__init__(likelihood, model, num_data)
+    def __init__(self, likelihood, model, num_data, clip_range, beta):
+        super().__init__(likelihood, model, num_data, beta)
         self.clip_range = clip_range
 
     def _log_likelihood_term(self, approximate_dist_f, target, **kwargs):
@@ -50,7 +50,7 @@ class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
         ratio = torch.exp(deep_log_prob - old_log_probs)    # Note: Subtraction is division in log space.
         surr1 = ratio * advantages
         surr2 = torch.clamp(ratio, 1.0 - self.clip_range, 1.0 + self.clip_range) * advantages
-        policy_loss = -torch.min(surr1, surr2).mean() #sum(-1)   # sum(-1) ?
+        policy_loss = torch.min(surr1, surr2).mean() #sum(-1)   # sum(-1) ?
 
         # Return advantage-weighted log probabilities
         return policy_loss

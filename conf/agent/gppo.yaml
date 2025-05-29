@@ -14,6 +14,7 @@ agent_params:
     max_grad_norm: 0.5
     num_inducing_points: 256
     num_quad_sites: 8
+    beta: 1.0
     hidden_layers_config:
         - output_dims: 1
           mean_type: "linear"

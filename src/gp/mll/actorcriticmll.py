@@ -12,19 +12,22 @@ class ActorCriticMLL:
     """
 
     def __init__(self, model: ActorCriticDGP, likelihood, num_data,
-                 clip_range: float, vf_coef: float, ent_coef: float):
+                 clip_range: float, vf_coef: float, ent_coef: float,
+                 beta: float):
         self.mll_policy = PolicyGradientDeepPredictiveLogLikelihood(
             likelihood,
             model,
             num_data=num_data,
-            clip_range=clip_range
+            clip_range=clip_range,
+            beta=beta
         )
 
         # Can just use the regular likelihood for the value function.
         self.mll_value = DeepPredictiveLogLikelihood(
             likelihood,
             model,
-            num_data=num_data
+            num_data=num_data,
+            beta=beta
         )
 
         self.model = model
