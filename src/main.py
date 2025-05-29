@@ -1,6 +1,7 @@
 import os
 import hydra
 import gymnasium as gym
+import wandb
 from omegaconf import DictConfig, OmegaConf
 from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import create_rl_agent_catch, eval_rl_agent, train_rl_agent
@@ -15,6 +16,13 @@ def main(cfg: DictConfig):
     Entrypoint of program. See hydra configs.
     """
     print(OmegaConf.to_yaml(cfg))
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.wandb.project,
+            entity=cfg.wandb.entity,
+            config=dict(cfg),
+            name=cfg.wandb.run_name
+        )
 
     if cfg.mode.name == 'train':
         metrics_path = os.path.join(cfg.results_save_path, "metrics.json")
@@ -55,6 +63,9 @@ def main(cfg: DictConfig):
         )
         best = bo.optimize(n_trials=cfg.mode.hpo.n_trials)
         print("Best hyperparameters found:", best)
+
+    if cfg.use_wandb:
+        wandb.finish()
 
 
 if __name__ == '__main__':

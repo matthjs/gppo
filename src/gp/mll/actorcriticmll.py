@@ -12,7 +12,7 @@ class ActorCriticMLL:
     """
 
     def __init__(self, model: ActorCriticDGP, likelihood, num_data,
-                 clip_range: float):
+                 clip_range: float, vf_coef: float, ent_coef: float):
         self.mll_policy = PolicyGradientDeepPredictiveLogLikelihood(
             likelihood,
             model,
@@ -28,19 +28,30 @@ class ActorCriticMLL:
         )
 
         self.model = model
+        self.vf_coef = vf_coef
+        self.ent_coef = ent_coef
 
     def __call__(self, states, actions, advantages, returns, old_log_probs) -> torch.Tensor:
         """
         """
         policy_dist, value_dist = self.model(states)
-        loss = -self.mll_policy(
+        # PPO clipped policy loss
+        policy_loss = -self.mll_policy(
             policy_dist,
             actions.squeeze(-1),
             adv=advantages.squeeze(-1),
             old_log_probs=old_log_probs
-        ).mean() + -self.mll_value(
+        ).mean()
+
+        # Value function loss
+        value_loss = -self.mll_value(
             value_dist,
             returns.squeeze(-1)
         ).mean()
+
+        entropy_bonus = policy_dist.entropy().mean()
+
+        # Total loss: policy + value - entropy_bonus
+        loss = policy_loss + value_loss - self.ent_coef * entropy_bonus
 
         return loss

@@ -1,5 +1,7 @@
 from typing import Optional
 import torch
+import wandb
+
 from src.agents.agent import Agent
 from src.agents.gpreinforceagent import GPReinforceAgent
 from src.util.environment import CatchEnv
@@ -13,7 +15,8 @@ def agent_env_loop(
         tracker: Optional[MetricsTracker] = None,
         learning: bool = True,
         env=None,
-        verbose: bool = False
+        verbose: bool = False,
+        use_wandb: bool = True
 ) -> float:
     """
     Run the environment-agent interaction loop.

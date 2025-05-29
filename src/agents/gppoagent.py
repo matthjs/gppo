@@ -71,7 +71,9 @@ class GPPOAgent(OnPolicyAgent):
         self.objective = ActorCriticMLL(self.policy,
                                         self.policy.likelihood,
                                         num_data=self.batch_size,
-                                        clip_range=self.clip_range)
+                                        clip_range=self.clip_range,
+                                        vf_coef=self.vf_coef,
+                                        ent_coef=self.ent_coef)
 
         self.last_log_prob = None
         self.last_value = None
