@@ -12,11 +12,11 @@ from src.metrics.metrictracker import MetricsTracker
 def agent_env_loop(
         agent: Agent,
         num_episodes: int,
-        tracker: Optional[MetricsTracker] = None,
+        wandb_logger,
+        # tracker: Optional[MetricsTracker] = None,
         learning: bool = True,
         env=None,
         verbose: bool = False,
-        use_wandb: bool = True
 ) -> float:
     """
     Run the environment-agent interaction loop.
@@ -48,28 +48,34 @@ def agent_env_loop(
                 agent.update()
                 if not isinstance(agent, GPReinforceAgent):
                     learning_info = agent.learn()
-                    if tracker and learning_info:
-                        for key, value in learning_info.items():
-                            tracker.record_metric(key, agent_id=type(agent).__name__,
-                                                  episode_idx=episode, value=value)
+                    if learning_info and wandb_logger:
+                        wandb_logger.log(learning_info, agent_id=type(agent).__name__,
+                                         episode=episode)
+                    # if tracker and learning_info:
+                    #     for key, value in learning_info.items():
+                    #        tracker.record_metric(key, agent_id=type(agent).__name__,
+                    #                              episode_idx=episode, value=value)
 
             episode_return += reward
             obs = next_obs
 
             if terminated or truncated:
                 # This is akward but for now acceptable
-                if isinstance(agent, GPReinforceAgent):
-                    learning_info = agent.learn()
-                    if tracker and learning_info:
-                        for key, value in learning_info.items():
-                            tracker.record_metric(key, agent_id=type(agent).__name__,
-                                                  episode_idx=episode, value=value)
+                # if isinstance(agent, GPReinforceAgent):
+                #     learning_info = agent.learn()
+                #     if tracker and learning_info:
+                #         for key, value in learning_info.items():
+                #            tracker.record_metric(key, agent_id=type(agent).__name__,
+                #                                  episode_idx=episode, value=value)
 
                 if verbose:
                     print(f"episode {episode} | reward: {episode_return}")
-                if tracker:
-                    tracker.record_metric("return", agent_id=type(agent).__name__,
-                                          episode_idx=episode, value=episode_return)
+
+                if wandb_logger:
+                    wandb_logger.log({"return": episode_return}, agent_id=type(agent).__name__,
+                                     episode=episode)
+                # tracker.record_metric("return", agent_id=type(agent).__name__,
+                #                          episode_idx=episode, value=episode_return)
                 total_return += episode_return
                 break
 

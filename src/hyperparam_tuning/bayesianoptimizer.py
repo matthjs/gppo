@@ -2,6 +2,7 @@
 Taken from: https://github.com/matthjs/xai-gp/blob/main/xai_gp/hyperparam_tuning/bayesianoptimizer.py
 with slight adjustments to ensure compatibility with RL Agents.
 """
+import json
 from typing import Callable, Tuple, List, Union
 from ax import Experiment
 from ax.service.ax_client import AxClient
@@ -9,6 +10,7 @@ import torch
 from typing import Dict, Any, Optional
 from ax.service.utils.instantiation import ObjectiveProperties
 from src.agents.agent import Agent
+from src.util.wandblogger import WandbLogger
 
 
 class BayesianOptimizer:
@@ -22,6 +24,7 @@ class BayesianOptimizer:
             tracking_metrics: Optional[Tuple[str]] = None,
             objective_name: str = "loss",
             minimize: bool = True,
+            wandb_logger: Optional[WandbLogger] = None
     ):
         """
         Generic Bayesian optimization wrapper for various models.
@@ -64,6 +67,8 @@ class BayesianOptimizer:
             objectives={self.objective_name: ObjectiveProperties(minimize=self.minimize)},
         )
 
+        self.logger = wandb_logger
+
     def run_trial(self, params: Dict[str, Any]) -> Dict[str, float]:
         """Execute a single optimization trial"""
         model = self.model_factory(params)
@@ -92,7 +97,19 @@ class BayesianOptimizer:
                 raw_data=metrics[self.objective_name]
             )
 
-        return self.get_best_parameters()
+            if self.logger:
+                pass
+                # This is really not as useful as it seems.
+                # metrics_with_params = {**params, **metrics}
+                # metrics_with_params.pop('device', None)
+                # self.logger.log(metrics_with_params)
+
+        best = self.get_best_parameters()
+        if self.logger:
+            with open("./results/best_hyperparams.json", "w") as f:
+                json.dump(best, f, indent=4)
+            self.logger.save("./results/best_hyperparams.json")
+        return best
 
     def get_best_parameters(self) -> Dict[str, Any]:
         """Return best parameters found"""

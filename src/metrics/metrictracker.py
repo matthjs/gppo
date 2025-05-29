@@ -46,8 +46,6 @@ class MetricsTracker:
         self.n_bootstrap = n_bootstrap
         self.ci_alpha = ci_alpha
         self.register_metric("loss")
-        self.register_metric("q_loss")
-        self.register_metric("v_loss")
         self.register_metric("return")
 
         self.save_path = "./"
@@ -421,8 +419,8 @@ class MetricsTracker:
         Get the entire history of recorded metrics.
         """
         with self._lock:
-            return {m: {a: dict(es) for a, es in agents.items()}
-                    for m, agents in self._metrics_history.items()}
+            return self._metrics_history # {m: {a: dict(es) for a, es in agents.items()}
+                    #for m, agents in self._metrics_history.items()}
 
     def export_metrics(self, file_path: str) -> None:
         """

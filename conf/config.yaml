@@ -1,18 +1,18 @@
 defaults:
-  - mode: train  # Set a default mode value, it can be overridden by command-line args
-  - agent: random
+  - mode: hpo_gppo  # Set a default mode value, it can be overridden by command-line args
+  - agent: gppo
   - _self_
 
 # Common hyperparameters (can be overridden)
-num_episodes: 5000
+num_episodes: 1000
 num_bootstrap_samples: 100
 num_runs: 1
-results_save_path: "../results/"
+results_save_path: "./results/"
+environment: "InvertedPendulum-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 wandb:
   project: "gppo-drl"
-  entity: "m-r-van-der-lende"
-  run_name: "training"
+  entity: "ml_exp"
   use_wandb: True
 
 # Hydra plugin settings

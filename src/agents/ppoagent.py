@@ -74,6 +74,7 @@ class PPOAgent(OnPolicyAgent):
             max_grad_norm: float = 0.5,
             target_kl: Optional[float] = None,
             device: torch.device = torch.device("cpu"),
+            **kwargs
     ):
         """
         :param state_dimensions:

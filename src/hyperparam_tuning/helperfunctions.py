@@ -1,36 +1,71 @@
+from typing import Dict, Any, Union
+from src.agents.agent import Agent
+from src.agents.agentfactory import AgentFactory
+from src.util.interaction import agent_env_loop, create_agent_for_catch_env
 from typing import Dict, Any
 from src.agents.agent import Agent
-from src.util.interaction import agent_env_loop, create_agent_for_catch_env
+from src.util.interaction import agent_env_loop
+import gymnasium as gym
 
 
-def train_rl_agent(agent: Agent, params: Dict[str, Any]) -> Dict[str, float]:
+def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env) -> Dict[str, float]:
     """
     Train the RL agent with the given hyperparameters.
 
     :param agent: RL Agent to train.
     :param params: The hyperparameters to use during training.
-    :return: The average return over the number of episodes.
+    :param env: The environment to train in (must follow Gym API).
+    :return: Dictionary with training metrics.
     """
-    # defaults to Catch environment
-    agent_env_loop(agent,
-                   params['num_episodes'],
-                   learning=True)
-    # Could maybe return something here.
-    return {}
+    avg_return = agent_env_loop(
+        agent=agent,
+        num_episodes=params['num_episodes'],
+        wandb_logger=params.get("wandb_logger", None),
+        learning=True,
+        env=env,
+        verbose=params.get("verbose", False),
+    )
+    return {"train/avg_return": avg_return}
 
 
-def eval_rl_agent(agent: Agent, params: Dict[str, Any]) -> Dict[str, float]:
+def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env) -> Dict[str, float]:
     """
-    Evaluate the RL agent, e.g., let it interact with the environment without
-    performing any learning update.
+    Evaluate the RL agent (no learning updates).
 
     :param agent: RL Agent to evaluate.
-    :param params: Agent parameters (e.g., memory_size, learning rate etc.)
+    :param params: Hyperparameters (used for logging/evaluation).
+    :param env: The environment to evaluate in.
+    :return: Dictionary with evaluation metrics.
     """
-    ret = agent_env_loop(agent,
-                         params['num_eval_episodes'],
-                         learning=False)
-    return {"return": ret}
+    avg_return = agent_env_loop(
+        agent=agent,
+        num_episodes=params['num_eval_episodes'],
+        wandb_logger=params.get("wandb_logger", None),
+        learning=False,
+        env=env,
+        verbose=params.get("verbose", False),
+    )
+    return {"return": avg_return}
+
+
+def create_rl_agent(params: Dict[str, Any], env: Union[str, gym.Env]) -> Agent:
+    """
+    Create an RL agent using the AgentFactory with a specified environment.
+
+    :param env: A Gym environment instance or string name.
+    :param params: Dictionary of agent parameters, must include 'agent_type'.
+    :return: Instantiated Agent.
+    """
+    param_copy = dict(params)
+    agent_type = param_copy.pop('agent_type')
+
+    # Clean up any non-agent hyperparameters to avoid constructor issues
+    param_copy.pop('num_episodes', None)
+    param_copy.pop('num_eval_episodes', None)
+    param_copy.pop('wandb_logger', None)
+    param_copy.pop('verbose', None)
+
+    return AgentFactory.create_agent(agent_type=agent_type, env=env, agent_params=params)
 
 
 def create_rl_agent_catch(params: Dict[str, Any]) -> Agent:

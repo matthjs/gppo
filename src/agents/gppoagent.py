@@ -39,6 +39,7 @@ class GPPOAgent(OnPolicyAgent):
             max_grad_norm: float = 0.5,
             target_kl: Optional[float] = None,
             device: torch.device = torch.device("cpu"),
+            **kwargs
     ):
         super().__init__(
             memory_size,
@@ -95,7 +96,12 @@ class GPPOAgent(OnPolicyAgent):
 
         self.last_log_prob = log_prob
         self.last_value = value_dist.mean.mean(0)
-        return action.mean(0).cpu().numpy()# .squeeze(0)
+
+        action_t = action.mean(0)
+        if action_t.dim() > 1:
+            return action_t.squeeze(0).cpu().numpy()
+
+        return action_t.cpu().numpy()
 
     def store_transition(
             self,

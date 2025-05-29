@@ -4,28 +4,22 @@ agent_params:
     memory_size: 128
     batch_size: 128
     learning_rate: 0.000222425
-    n_epochs: 5
+    n_epochs: 2
     gamma: 0.999
     gae_lambda: 0.9
     clip_range: 0.4
     clip_range_vf: null         # corresponds to Optional[float] = None
-    ent_coef:  0.1 # 1.37976e-07
+    ent_coef:  0.0001 # 1.37976e-07
     vf_coef: 0.19816
-    max_grad_norm: 0.3
+    max_grad_norm: 0.5
     num_inducing_points: 256
     num_quad_sites: 8
     hidden_layers_config:
-        - output_dims: 4
-          mean_type: "linear"
-        - output_dims: 4
-          mean_type: "linear"
-    policy_hidden_config:
         - output_dims: 1
           mean_type: "linear"
+    policy_hidden_config:
         - output_dims: null
           mean_type: "constant"
     value_hidden_config:
-        - output_dims: 1
-          mean_type: "linear"
         - output_dims: null
           mean_type: "constant"

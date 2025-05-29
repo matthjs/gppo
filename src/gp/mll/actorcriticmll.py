@@ -31,15 +31,24 @@ class ActorCriticMLL:
         self.vf_coef = vf_coef
         self.ent_coef = ent_coef
 
+    def _conditional_squeeze(self, x: torch.Tensor) -> bool:
+        if x.dim() > 1 and x.shape[1] == 1:
+            return True
+
+        return False
+
     def __call__(self, states, actions, advantages, returns, old_log_probs) -> torch.Tensor:
         """
         """
+        # conditionally squeeze()
+        do_squeeze = self._conditional_squeeze(actions)
+
         policy_dist, value_dist = self.model(states)
         # PPO clipped policy loss
         policy_loss = -self.mll_policy(
             policy_dist,
-            actions.squeeze(-1),
-            adv=advantages.squeeze(-1),
+            actions.squeeze(-1) if do_squeeze else actions,
+            adv=advantages.squeeze(-1) if do_squeeze else advantages,
             old_log_probs=old_log_probs
         ).mean()
 

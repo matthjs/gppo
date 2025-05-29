@@ -16,6 +16,25 @@ from src.agents.ppoagent import PPOAgent
 
 
 class AgentFactory:
+    # TODO: Find a better way to do this
+    DGP_ARCHITECTURES = {
+        0: {
+            "hidden_layers_config": [{"output_dims": 1, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": None, "mean_type": "constant"}],
+            "value_hidden_config": [{"output_dims": None, "mean_type": "constant"}],
+        },
+        1: {
+            "hidden_layers_config": [{"output_dims": 64, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": 64, "mean_type": "linear"}],
+            "value_hidden_config": [{"output_dims": 64, "mean_type": "linear"}],
+        },
+        2: {
+            "hidden_layers_config": [{"output_dims": 128, "mean_type": "constant"}],
+            "policy_hidden_config": [{"output_dims": 128, "mean_type": "constant"}],
+            "value_hidden_config": [{"output_dims": 128, "mean_type": "constant"}],
+        },
+    }
+
     @staticmethod
     def create_agent(agent_type: str,
                      env: Union[gym.Env, str],
@@ -25,7 +44,7 @@ class AgentFactory:
         Create an agent of agent_type with agent_params.
         """
         if isinstance(env, str):
-            env = gym.make(env)   # Env params?
+            env = gym.make(env)  # Env params?
 
         obs_space = env.observation_space
         action_space = env.action_space
@@ -53,12 +72,21 @@ class AgentFactory:
             return DQVMaxAgent(**agent_params) if not agent_params['dueling_architecture'] else \
                 type("DQVMaxAgent", (DQVMaxAgent,), {})(**agent_params)
         elif agent_type == "GPReinforce":
-            return GPReinforceAgent(**agent_params)    # I don't think this runs anymore due to outdated interface somehwere.
+            return GPReinforceAgent(
+                **agent_params)  # I don't think this runs anymore due to outdated interface somehwere.
         elif agent_type == "Reinforce":
             return ReinforceAgent(**agent_params)
         elif agent_type == "PPO":
             return PPOAgent(**agent_params)
         elif agent_type == "GPPO":
+            # Check if architecture_choice is present
+            arch_choice = agent_params.pop("architecture_choice", None)
+            if arch_choice is not None:
+                arch_config = AgentFactory.DGP_ARCHITECTURES.get(arch_choice)
+                if arch_config is None:
+                    raise ValueError(f"Invalid architecture_choice {arch_choice} for GPPOAgent.")
+                # Update agent_params with architecture config
+                agent_params.update(arch_config)
             return GPPOAgent(**agent_params)
         elif agent_type == "RANDOM":
             return RandomAgent(action_space)
