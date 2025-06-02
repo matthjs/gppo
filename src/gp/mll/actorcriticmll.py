@@ -11,11 +11,15 @@ class ActorCriticMLL:
     Wrapper for RL training loop integration
     """
 
-    def __init__(self, model: ActorCriticDGP, likelihood, num_data,
+    def __init__(self,
+                 model: ActorCriticDGP,
+                 policy_likelihood,
+                 value_likelihood,
+                 num_data,
                  clip_range: float, vf_coef: float, ent_coef: float,
                  beta: float):
         self.mll_policy = PolicyGradientDeepPredictiveLogLikelihood(
-            likelihood,
+            policy_likelihood,
             model,
             num_data=num_data,
             clip_range=clip_range,
@@ -24,7 +28,7 @@ class ActorCriticMLL:
 
         # Can just use the regular likelihood for the value function.
         self.mll_value = DeepPredictiveLogLikelihood(
-            likelihood,
+            value_likelihood,
             model,
             num_data=num_data,
             beta=beta
@@ -51,7 +55,7 @@ class ActorCriticMLL:
         policy_loss = -self.mll_policy(
             policy_dist,
             actions.squeeze(-1) if do_squeeze else actions,
-            adv=advantages.squeeze(-1) if do_squeeze else advantages,
+            adv=advantages.squeeze(-1), # if do_squeeze else advantages,
             old_log_probs=old_log_probs
         ).mean()
 
@@ -61,10 +65,16 @@ class ActorCriticMLL:
             returns.squeeze(-1)
         ).mean()
 
-        entropy_bonus = -torch.mean(-self.mll_policy.last_log_prob)    # Probably need to use approximate entropy
-        # entropy_bonus = policy_dist.entropy().mean()
+        # entropy_bonus = -torch.mean(-self.mll_policy.last_log_prob)    # Probably need to use approximate entropy
+        entropy_bonus = policy_dist.entropy().mean()
 
         # Total loss: policy + value - entropy_bonus
-        loss = policy_loss + self.vf_coef * value_loss + self.ent_coef * entropy_bonus
+        loss = policy_loss + self.vf_coef * value_loss # - self.ent_coef * entropy_bonus
+
+        # TODO: Remove this later
+        print("loss:", loss.item())
+        print("policy loss -->", policy_loss.item())
+        print("value loss -->", value_loss.item())
+        print("entropy bonus -->", entropy_bonus.item())
 
         return loss

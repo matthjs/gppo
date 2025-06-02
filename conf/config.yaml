@@ -1,14 +1,14 @@
 defaults:
   - mode: train  # Set a default mode value, it can be overridden by command-line args
-  - agent: gppo
+  - agent: ppo
   - _self_
 
 # Common hyperparameters (can be overridden)
-num_episodes: 1000
+num_episodes: 50
 num_bootstrap_samples: 100
 num_runs: 1
 results_save_path: "./results/"
-environment: "InvertedPendulum-v5"   # "InvertedPendulum-v5"   Walker2d-v5
+environment: "Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 wandb:
   project: "gppo-drl"

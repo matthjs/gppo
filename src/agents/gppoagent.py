@@ -2,6 +2,7 @@ from typing import Optional, List, Dict, Union, Any
 
 import numpy as np
 import torch
+from gpytorch.likelihoods import MultitaskGaussianLikelihood, GaussianLikelihood
 
 from src.agents.onpolicyagent import OnPolicyAgent
 from src.agents.ppoagent import PPOAgent
@@ -58,7 +59,8 @@ class GPPOAgent(OnPolicyAgent):
             policy_hidden_config=policy_hidden_config,
             value_hidden_config=value_hidden_config,
             num_inducing_points=num_inducing_points,
-            Q=num_quad_sites
+            Q=num_quad_sites,
+            num_actions=action_dimensions[-1]
         ).to(self.device)
 
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.learning_rate)
@@ -71,7 +73,8 @@ class GPPOAgent(OnPolicyAgent):
         self.max_grad_norm = max_grad_norm
 
         self.objective = ActorCriticMLL(self.policy,
-                                        self.policy.likelihood,
+                                        self.policy.policy_likelihood,
+                                        self.policy.value_likelihood,
                                         num_data=self.batch_size,
                                         clip_range=self.clip_range,
                                         vf_coef=self.vf_coef,
@@ -92,9 +95,9 @@ class GPPOAgent(OnPolicyAgent):
         action = action_dist.sample()
 
         # log_prob calculation (specific to DSPPs)
-        base_log_marginal = self.policy.likelihood.log_marginal(action, action_dist)
+        base_log_marginal = self.policy.policy_likelihood.log_marginal(action, action_dist)
         deep_log_marginal = self.policy.quad_weights.unsqueeze(-1) + base_log_marginal
-        log_prob = deep_log_marginal.logsumexp(dim=0).sum(-1) # action_dist.log_prob(action)  # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
+        log_prob = deep_log_marginal.logsumexp(dim=0) # action_dist.log_prob(action)  # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
 
         self.last_log_prob = log_prob
         self.last_value = value_dist.sample().mean(0)   # value_dist.mean.mean(0)   mean or sample?

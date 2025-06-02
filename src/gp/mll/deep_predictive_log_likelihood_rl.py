@@ -48,7 +48,10 @@ class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
             raise ValueError(f"Advantage shape {advantages.shape} must match "
                              f"log_prob shape {deep_log_prob.shape}")
 
-        ratio = torch.exp(deep_log_prob - old_log_probs)    # Note: Subtraction is division in log space.
+        # ratio = torch.exp(deep_log_prob - old_log_probs)    # Note: Subtraction is division in log space.
+        log_ratio = deep_log_prob - old_log_probs
+        log_ratio_clamped = torch.clamp(log_ratio, min=-20.0, max=20.0)
+        ratio = torch.exp(log_ratio_clamped)
         surr1 = ratio * advantages
         surr2 = torch.clamp(ratio, 1.0 - self.clip_range, 1.0 + self.clip_range) * advantages
         policy_loss = torch.min(surr1, surr2).mean() #sum(-1)   # sum(-1) ?

@@ -2,6 +2,7 @@ from typing import List, Dict, Tuple, Any
 
 import torch
 from gpytorch.distributions import MultivariateNormal
+from gpytorch.likelihoods import MultitaskGaussianLikelihood, GaussianLikelihood
 from torch import Tensor
 
 from src.gp.deepgplayers import DSPPHiddenLayer
@@ -12,6 +13,7 @@ class ActorCriticDGP(DSPPModel):
     def __init__(
         self,
         input_dim: int,
+        num_actions: int,
         hidden_layers_config: List[Dict[str, Any]],
         Q,
         num_inducing_points,
@@ -33,6 +35,8 @@ class ActorCriticDGP(DSPPModel):
         # out_dim got the output dimensions of latent var
         # policy_hidden_config take in out_dim and output action_dim
         # value_hidden_config take in out_dim and output dim=1
+        self.policy_likelihood = MultitaskGaussianLikelihood(num_actions)
+        self.value_likelihood = GaussianLikelihood()
 
         # Policy head configuration
         self.policy_head = torch.nn.ModuleList()
@@ -45,7 +49,7 @@ class ActorCriticDGP(DSPPModel):
                 output_dims=layer_config['output_dims'],
                 mean_type=layer_config['mean_type'],
                 num_inducing=layer_config.get('num_inducing', 128),
-                Q=self.Q
+                Q=self.Q,
             ))
             last_dim = layer_config['output_dims']
 
