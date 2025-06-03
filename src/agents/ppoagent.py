@@ -227,3 +227,27 @@ class PPOAgent(OnPolicyAgent):
         self.rollout_buffer.clear()
         info["loss"] = float(np.mean(losses))
         return info
+
+    def save(self, path: str) -> None:
+        torch.save({
+            'model_state_dict': self.policy.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'hyperparameters': {
+                'state_dimensions': self.state_dimensions,
+                'action_dimensions': self.action_dimensions,
+                'learning_rate': self.learning_rate,
+                'n_epochs': self.n_epochs,
+                'gae_lambda': self.gae_lambda,
+                'clip_range': self.clip_range,
+                'clip_range_vf': self.clip_range_vf,
+                'ent_coef': self.ent_coef,
+                'vf_coef': self.vf_coef,
+                'max_grad_norm': self.max_grad_norm,
+            }
+        }, path)
+
+    def load(self, path: str) -> None:
+        checkpoint = torch.load(path, map_location=self.device)
+        self.policy.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+

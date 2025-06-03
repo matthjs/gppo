@@ -1,5 +1,8 @@
 name: train
 
 train: True
-import_metrics: True
+load_model: False
+save_model: False
+model_path: "../models"   # e.g., /models/gppo/file.pth
+import_metrics: False
 export_metrics: True

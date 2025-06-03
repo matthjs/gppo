@@ -45,3 +45,9 @@ class Agent(ABC):
         """
 
         pass
+
+    def save(self, path: str) -> None:
+        raise NotImplementedError("save method not implemented!")
+
+    def load(self, path: str) -> None:
+        raise NotImplementedError("load method not implemented!")

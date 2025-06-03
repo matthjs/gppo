@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Optional
 
 import gymnasium as gym
 import torch
@@ -39,6 +39,8 @@ class AgentFactory:
     def create_agent(agent_type: str,
                      env: Union[gym.Env, str],
                      agent_params: dict,
+                     load_model: bool = False,
+                     model_path: Optional[str] = None,
                      device=None) -> Agent:
         """
         Create an agent of agent_type with agent_params.
@@ -57,27 +59,29 @@ class AgentFactory:
             "device": device,
         })
 
+        agent = None
+
         if agent_type == "DQN":
             # This looks like syntactic nonsense but basically we want to overwrite the class
             # type and name so that the dueling architecture variant is treated as a separate agent_type.
-            return DQNAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+            agent = DQNAgent(**agent_params) if not agent_params['dueling_architecture'] else \
                 type("DuelingDQNAgent", (DQNAgent,), {})(**agent_params)
         elif agent_type == "DDQN":
-            return DDQNAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+            agent = DDQNAgent(**agent_params) if not agent_params['dueling_architecture'] else \
                 type("DuelingDDQNAgent", (DDQNAgent,), {})(**agent_params)
         elif agent_type == "DQV":
-            return DQVAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+            agent = DQVAgent(**agent_params) if not agent_params['dueling_architecture'] else \
                 type("DuelingDQVAgent", (DQVAgent,), {})(**agent_params)
         elif agent_type == "DQV-Max":
-            return DQVMaxAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+            agent = DQVMaxAgent(**agent_params) if not agent_params['dueling_architecture'] else \
                 type("DQVMaxAgent", (DQVMaxAgent,), {})(**agent_params)
         elif agent_type == "GPReinforce":
-            return GPReinforceAgent(
+            agent = GPReinforceAgent(
                 **agent_params)  # I don't think this runs anymore due to outdated interface somehwere.
         elif agent_type == "Reinforce":
-            return ReinforceAgent(**agent_params)
+            agent = ReinforceAgent(**agent_params)
         elif agent_type == "PPO":
-            return PPOAgent(**agent_params)
+            agent = PPOAgent(**agent_params)
         elif agent_type == "GPPO":
             # Check if architecture_choice is present
             arch_choice = agent_params.pop("architecture_choice", None)
@@ -87,8 +91,15 @@ class AgentFactory:
                     raise ValueError(f"Invalid architecture_choice {arch_choice} for GPPOAgent.")
                 # Update agent_params with architecture config
                 agent_params.update(arch_config)
-            return GPPOAgent(**agent_params)
+            agent = GPPOAgent(**agent_params)
         elif agent_type == "RANDOM":
-            return RandomAgent(action_space)
+            agent = RandomAgent(action_space)
+        else:
+            raise ValueError("Invalid agent type")
 
-        raise ValueError("Invalid agent type")
+        if load_model:
+            # loads model weights
+            agent.load(model_path)
+
+        return agent
+

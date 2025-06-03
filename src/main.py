@@ -42,10 +42,8 @@ def main(cfg: DictConfig):
                 env = gym.make(cfg.environment)
                 agent = AgentFactory.create_agent(cfg.agent.agent_type, env,
                                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
-
-                # agent = create_agent_for_catch_env(cfg.agent.agent_type, cfg.num_episodes,
-                #                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
-                agent_env_loop(agent, cfg.num_episodes, logger, learning=True, env=env, verbose=True)
+                agent_env_loop(agent, cfg.num_episodes, logger, learning=True, env=env, verbose=True,
+                               save_model=cfg.mode.save_model)
 
         if not cfg.wandb.use_wandb:
             tracker.plot_all_metrics(num_episodes=cfg.num_episodes)
