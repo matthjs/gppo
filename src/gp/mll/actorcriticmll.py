@@ -69,7 +69,7 @@ class ActorCriticMLL:
         entropy_bonus = policy_dist.entropy().mean()
 
         # Total loss: policy + value - entropy_bonus
-        loss = policy_loss + self.vf_coef * value_loss - self.ent_coef * entropy_bonus
+        loss = policy_loss + self.vf_coef * value_loss # - self.ent_coef * entropy_bonus
 
         # TODO: Remove this later
         print("loss:", loss.item())

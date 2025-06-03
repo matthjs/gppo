@@ -35,7 +35,7 @@ class ActorCriticDGP(DSPPModel):
         # out_dim got the output dimensions of latent var
         # policy_hidden_config take in out_dim and output action_dim
         # value_hidden_config take in out_dim and output dim=1
-        self.policy_likelihood = MultitaskGaussianLikelihood(num_actions)
+        self.policy_likelihood = GaussianLikelihood() if num_actions == 1 else MultitaskGaussianLikelihood(num_actions)
         self.value_likelihood = GaussianLikelihood()
 
         # Policy head configuration
