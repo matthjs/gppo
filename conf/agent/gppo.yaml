@@ -15,11 +15,12 @@ agent_params:
     num_inducing_points: 128
     num_quad_sites: 8
     beta: 0.5 # 0.825162386521697
+    sample_vf: False,
     hidden_layers_config:
-        - output_dims: 1 # 6
+        - output_dims: 6 # 1 # 6
           mean_type: "linear"
     policy_hidden_config:
-        - output_dims: null # 6
+        - output_dims: 6 # null # 6
           mean_type: "constant"
     value_hidden_config:
         - output_dims: null

@@ -39,6 +39,7 @@ class GPPOAgent(OnPolicyAgent):
             ent_coef: float = 0.0,
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
+            sample_vf: bool = True,
             target_kl: Optional[float] = None,
             device: torch.device = torch.device("cpu"),
             **kwargs
@@ -71,6 +72,7 @@ class GPPOAgent(OnPolicyAgent):
         self.ent_coef = ent_coef
         self.vf_coef = vf_coef
         self.max_grad_norm = max_grad_norm
+        self.sample_vf = sample_vf
 
         self.objective = ActorCriticMLL(self.policy,
                                         self.policy.policy_likelihood,
@@ -100,7 +102,7 @@ class GPPOAgent(OnPolicyAgent):
         log_prob = deep_log_marginal.logsumexp(dim=0) # action_dist.log_prob(action)  # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
 
         self.last_log_prob = log_prob
-        self.last_value = value_dist.sample().mean(0)   # value_dist.mean.mean(0)   mean or sample?
+        self.last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)   # value_dist.mean.mean(0)   mean or sample?
 
         action_t = action.mean(0)
         if action_t.dim() > 1:
