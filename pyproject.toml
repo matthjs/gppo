@@ -23,6 +23,7 @@ torch = "^2.6.0"
 ax-platform = "^0.5.0"
 botorch = "^0.13.0"
 gpytorch = "^1.14"
+stable-baselines3 = "^2.6.0"
 
 
 [build-system]
