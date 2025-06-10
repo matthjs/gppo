@@ -7,7 +7,7 @@ import time
 from gpytorch.mlls import DeepPredictiveLogLikelihood
 
 from src.gp.gpbase import GPytorchModel
-from src.util.logging import log_training_start, log_epoch_stats, log_training_end
+from src.util.logs import log_training_start, log_epoch_stats, log_training_end
 
 
 def run_gp_epoch(model, data_loader, mll, optimizer=None, is_training=True):
