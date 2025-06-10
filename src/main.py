@@ -9,6 +9,7 @@ from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import create_rl_agent_catch, eval_rl_agent, train_rl_agent, create_rl_agent
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer
 from src.metrics.metrictracker import MetricsTracker
+from src.util.actionrescaler import ActionRescaleWrapper
 from src.util.interaction import create_agent_for_catch_env, agent_env_loop
 from src.util.wandblogger import WandbLogger
 
@@ -40,6 +41,8 @@ def main(cfg: DictConfig):
         if cfg.mode.train:
             for _ in range(cfg.num_runs):
                 env = gym.make(cfg.environment)
+                # if cfg.environment == "InvertedPendulum-v5":
+                #    env = ActionRescaleWrapper(env, new_low=-1, new_high=1)
                 agent = AgentFactory.create_agent(cfg.agent.agent_type, env,
                                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
                 agent_env_loop(agent, cfg.num_episodes, logger, learning=True, env=env, verbose=True,

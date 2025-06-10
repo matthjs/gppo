@@ -8,7 +8,7 @@ num_episodes: 2000
 num_bootstrap_samples: 100
 num_runs: 1
 results_save_path: "./results/"
-environment: "Walker2d-v5" #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
+environment: "Walker2d-v5"  # Walker2d-v5" #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 wandb:
   project: "gppo-drl"
