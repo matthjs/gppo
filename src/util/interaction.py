@@ -7,6 +7,7 @@ from src.agents.gpreinforceagent import GPReinforceAgent
 from src.util.environment import CatchEnv
 from src.agents.agentfactory import AgentFactory
 from src.metrics.metrictracker import MetricsTracker
+from src.util.vecnormalize import VecNormalizeGymEnv
 
 
 def agent_env_loop(
@@ -17,7 +18,8 @@ def agent_env_loop(
         learning: bool = True,
         env=None,
         verbose: bool = False,
-        save_model: bool = False
+        save_model: bool = False,
+        normalize_obs: bool = True
 ) -> float:
     """
     Run the environment-agent interaction loop.
@@ -37,6 +39,8 @@ def agent_env_loop(
     total_return = 0.0
 
     start_episode = getattr(agent, "current_episode", 0)
+    if normalize_obs:
+        env = VecNormalizeGymEnv(env, norm_obs=True)
 
     try:
         for episode in range(start_episode, start_episode + num_episodes):
