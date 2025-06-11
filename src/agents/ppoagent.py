@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 from torch.distributions import Normal, Categorical
 from typing import Dict, Any, Tuple, Optional, List
-
+from torch.nn import functional as F
 
 class ActorCritic(nn.Module):
     def __init__(
@@ -123,13 +123,15 @@ class PPOAgent(OnPolicyAgent):
         self.next_state = None
 
     def choose_action(self, observation: np.ndarray) -> Any:
-        state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
-        dist, value, _ = self.policy(state)
-        action = dist.sample()
-        log_prob = dist.log_prob(action).sum(dim=-1)
-        self.last_log_prob = log_prob
-        self.last_value = value
-        return action.cpu().numpy().squeeze(0)
+        self.policy.eval()
+        with torch.no_grad():
+            state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+            dist, value, _ = self.policy(state)
+            action = dist.sample()
+            log_prob = dist.log_prob(action).sum(dim=-1)
+            self.last_log_prob = log_prob
+            self.last_value = value
+            return action.cpu().numpy().squeeze(0)
 
     def store_transition(
             self,
@@ -169,6 +171,7 @@ class PPOAgent(OnPolicyAgent):
         Usage: run the learn() method at every timestep in the environment,
         it will only update the agent once the rollout_buffer has been filled.
         """
+        self.policy.train()
         # Get last state value for GAE
         if len(self.rollout_buffer) < self.memory_size:
             return {}
@@ -213,7 +216,7 @@ class PPOAgent(OnPolicyAgent):
                     )
 
                 # Value loss --> TD(gae_lambda) target.
-                value_loss = nn.HuberLoss(delta=1)(returns, value_pred.unsqueeze(-1))
+                value_loss = F.mse_loss(returns, value_pred.unsqueeze(-1))
 
                 # Full surrogate loss: L_clip - c1 * L_VF + c_2 S[pi](s_t)
                 loss = policy_loss + self.vf_coef * value_loss - self.ent_coef * entropy

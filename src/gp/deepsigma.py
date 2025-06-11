@@ -9,7 +9,7 @@ from gpytorch.likelihoods import GaussianLikelihood, SoftmaxLikelihood
 from gpytorch.models.deep_gps.dspp import DSPP
 from pandas import Categorical
 from torch import Tensor
-
+import torch.nn as nn
 from src.gp.deepgplayers import DSPPHiddenLayer
 from src.gp.gpbase import GPytorchModel
 
@@ -53,16 +53,21 @@ class DSPPModel(DSPP, GPytorchModel):
             hidden_layers_config
 
         # Build hidden layers
-        for layer_config in hidden_layers_config:
-            hidden_layer = DSPPHiddenLayer(
-                input_dims=input_dims,
-                output_dims=layer_config['output_dims'],
-                num_inducing=num_inducing_points,
-                mean_type=layer_config['mean_type'],
-                Q=Q
-            )
-            self.layers.append(hidden_layer)
-            input_dims = hidden_layer.output_dims if hidden_layer.output_dims else 1
+        if hidden_layers_config is None:
+            print("[DSPP Constructor] WARNING: No hidden layers configuration is provided. Forward()"
+                  " will call the identity function.")
+            self.layers.append(nn.Identity())
+        else:
+            for layer_config in hidden_layers_config:
+                hidden_layer = DSPPHiddenLayer(
+                    input_dims=input_dims,
+                    output_dims=layer_config['output_dims'],
+                    num_inducing=num_inducing_points,
+                    mean_type=layer_config['mean_type'],
+                    Q=Q
+                )
+                self.layers.append(hidden_layer)
+                input_dims = hidden_layer.output_dims if hidden_layer.output_dims else 1
 
         self.out_dim = input_dims
         self.layers = torch.nn.ModuleList(self.layers)

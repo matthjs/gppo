@@ -109,7 +109,7 @@ class ActorCriticDGP(DSPPModel):
         with torch.no_grad():
             policy_dist, value_dist = self(X, mean_input=X)
             if apply_likelihood:
-                policy_dist = self.likelihood(policy_dist)
-                value_dist = self.likelihood(value_dist)
+                policy_dist = self.policy_likelihood(policy_dist)
+                value_dist = self.value_likelihood(value_dist)
 
         return policy_dist, value_dist

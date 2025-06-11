@@ -91,24 +91,27 @@ class GPPOAgent(OnPolicyAgent):
             self,
             observation: np.ndarray
     ) -> Union[int, np.ndarray]:
-        state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
-        action_dist, value_dist = self.policy(state)
-        # NOTE: Do something smarter here with action selection
-        action = action_dist.sample()
+        self.policy.eval()
+        with torch.no_grad():
+            state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+            action_dist, value_dist = self.policy(state)
+            # action_dist = self.policy.policy_likelihood(action_dist)
+            # value_dist = self.policy.value_likelihood(value_dist)
+            action = action_dist.sample().mean(0)
 
-        # log_prob calculation (specific to DSPPs)
-        base_log_marginal = self.policy.policy_likelihood.log_marginal(action, action_dist)
-        deep_log_marginal = self.policy.quad_weights.unsqueeze(-1) + base_log_marginal
-        log_prob = deep_log_marginal.logsumexp(dim=0) # action_dist.log_prob(action)  # NOTE TO SELF THIS IS PROBABLY NOT CORRECT
+            # log_prob calculation (specific to DSPPs)
+            base_log_marginal = self.policy.policy_likelihood.log_marginal(action, action_dist)
+            deep_log_marginal = self.policy.quad_weights.unsqueeze(-1) + base_log_marginal
+            log_prob = deep_log_marginal.logsumexp(dim=0)
 
-        self.last_log_prob = log_prob
-        self.last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)   # value_dist.mean.mean(0)   mean or sample?
+            self.last_log_prob = log_prob
+            self.last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
 
-        action_t = action.mean(0)
-        if action_t.dim() > 1:
-            return action_t.squeeze(0).cpu().numpy()
+            action_t = action # .mean(0)
+            if action_t.dim() > 1:
+                return action_t.squeeze(0).cpu().numpy()
 
-        return action_t.cpu().numpy()
+            return action_t.cpu().numpy()
 
     def store_transition(
             self,
@@ -133,6 +136,7 @@ class GPPOAgent(OnPolicyAgent):
         Usage: run the learn() method at every timestep in the environment,
         it will only update the agent once the rollout-buffer has been filled.
         """
+        self.policy.train()
         if len(self.rollout_buffer) < self.batch_size:
             return {}
 
@@ -140,6 +144,7 @@ class GPPOAgent(OnPolicyAgent):
         last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
         with torch.no_grad():
             _, value_dist = self.policy(last_state)
+            # value_dist = self.policy.value_likelihood(value_dist)
             last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
 
         # compute returns and advantages
