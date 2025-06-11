@@ -3,6 +3,7 @@ from src.gp.acdeepsigma import ActorCriticDGP
 from gpytorch.likelihoods import GaussianLikelihood
 import torch
 
+from src.gp.deepsigma import sample_from_gmm
 from src.gp.mll.deep_predictive_log_likelihood_rl import PolicyGradientDeepPredictiveLogLikelihood
 
 
@@ -44,6 +45,16 @@ class ActorCriticMLL:
 
         return False
 
+    # Proper entropy approximation for Gaussian mixture
+    def _estimate_entropy(self, dist, weights, n_samples=10):
+        samples = sample_from_gmm(weights, dist.mean, dist.variance, n_samples)
+        log_probs = []
+        for s in samples:
+            base_log = dist.log_prob(s.unsqueeze(0))  # Implement this
+            deep_log = weights.log() + base_log
+            log_probs.append(deep_log.logsumexp(dim=0))
+        return -torch.stack(log_probs).mean()
+
     def __call__(self, states, actions, advantages, returns, old_log_probs) -> torch.Tensor:
         """
         """
@@ -65,7 +76,7 @@ class ActorCriticMLL:
             returns.squeeze(-1)
         ).mean()
 
-        entropy_bonus = -torch.mean(-self.mll_policy.last_log_prob)    # Probably need to use approximate entropy
+        entropy_bonus = -torch.mean(self.mll_policy.last_log_prob)    # Probably need to use approximate entropy
         # entropy_bonus = -policy_dist.entropy().mean()
 
         # Total loss: policy + value - entropy_bonus
