@@ -12,6 +12,53 @@ from torch import Tensor
 import torch.nn as nn
 from src.gp.deepgplayers import DSPPHiddenLayer
 from src.gp.gpbase import GPytorchModel
+import numpy as np
+
+import torch
+from torch import Tensor
+
+import torch
+
+import torch
+
+def sample_from_gmm(weights: torch.Tensor,
+                    means: torch.Tensor,
+                    variances: torch.Tensor,
+                    num_samples: int) -> torch.Tensor:
+    """
+    Sample from a Gaussian mixture model with diagonal covariance.
+
+    Args:
+        weights: tensor of shape [Q, 1] or [Q], mixture weights (sum to 1)
+        means: tensor of shape [Q, 1, D] or [Q, 1] (univariate)
+        variances: tensor of shape [Q, 1, D] or [Q, 1]
+        num_samples: number of samples to draw
+
+    Returns:
+        samples: tensor of shape [num_samples, D] or [num_samples] (univariate)
+    """
+    # Flatten weights to 1D if needed
+    weights = weights.squeeze(-1)  # shape [Q]
+
+    # Sample component indices
+    component_indices = torch.multinomial(weights, num_samples, replacement=True)  # [num_samples]
+
+    # Squeeze means/variances dims of 1 if present
+    means = means.squeeze(1)      # [Q, D] or [Q]
+    variances = variances.squeeze(1)  # [Q, D] or [Q]
+
+    # Gather the selected components' means and variances
+    selected_means = means[component_indices]       # [num_samples, D] or [num_samples]
+    selected_vars = variances[component_indices]    # [num_samples, D] or [num_samples]
+
+    std_devs = torch.sqrt(selected_vars)
+
+    # Sample from Normal distributions
+    eps = torch.randn_like(std_devs)  # same shape as selected_means
+    samples = selected_means + eps * std_devs
+
+    return samples
+
 
 
 class DSPPModel(DSPP, GPytorchModel):

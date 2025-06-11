@@ -15,8 +15,10 @@ hpo:
       value: 128
       value_type: int
     - name: memory_size
-      type: fixed
-      value: 128
+      type: range
+      bounds:
+        - 32
+        - 128
       value_type: int
     - name: num_episodes
       type: fixed
@@ -84,13 +86,11 @@ hpo:
       type: range
       bounds:
         - 128
-        - 350
+        - 250
       value_type: int
     - name: num_quad_sites
-      type: range
-      bounds:
-        - 4
-        - 12
+      type: fixed
+      value: 8
       value_type: int
   objective_name: "return"
   minimize: false

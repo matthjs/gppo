@@ -7,6 +7,7 @@ from gpytorch.likelihoods import MultitaskGaussianLikelihood, GaussianLikelihood
 from src.agents.onpolicyagent import OnPolicyAgent
 from src.agents.ppoagent import PPOAgent
 from src.gp.acdeepsigma import ActorCriticDGP
+from src.gp.deepsigma import sample_from_gmm
 from src.gp.mll.actorcriticmll import ActorCriticMLL
 from src.agents.onpolicyagent import OnPolicyAgent
 import numpy as np
@@ -95,17 +96,22 @@ class GPPOAgent(OnPolicyAgent):
         with torch.no_grad():
             state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
             action_dist, value_dist = self.policy(state)
+
+            quad_weights_log = self.policy.quad_weights.unsqueeze(-1)
+            quad_weights = quad_weights_log.exp()
             # action_dist = self.policy.policy_likelihood(action_dist)
             # value_dist = self.policy.value_likelihood(value_dist)
-            action = action_dist.sample().mean(0)
-
+            # action = action_dist.sample().mean(0)
+            action = sample_from_gmm(quad_weights, action_dist.mean, action_dist.variance, 1)
             # log_prob calculation (specific to DSPPs)
             base_log_marginal = self.policy.policy_likelihood.log_marginal(action, action_dist)
-            deep_log_marginal = self.policy.quad_weights.unsqueeze(-1) + base_log_marginal
+            deep_log_marginal = quad_weights_log + base_log_marginal
             log_prob = deep_log_marginal.logsumexp(dim=0)
 
             self.last_log_prob = log_prob
-            self.last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
+            #self.last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
+            self.last_value = sample_from_gmm(quad_weights, value_dist.mean, value_dist.variance, 1) if \
+                self.sample_vf else (quad_weights * value_dist.mean).sum(0)
 
             action_t = action # .mean(0)
             if action_t.dim() > 1:
@@ -144,8 +150,11 @@ class GPPOAgent(OnPolicyAgent):
         last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
         with torch.no_grad():
             _, value_dist = self.policy(last_state)
+            quad_weights = self.policy.quad_weights.unsqueeze(-1).exp()
             # value_dist = self.policy.value_likelihood(value_dist)
-            last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
+            # last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
+            last_value = sample_from_gmm(quad_weights, value_dist.mean, value_dist.variance, 1) if \
+                self.sample_vf else (quad_weights * value_dist.mean).sum(0)
 
         # compute returns and advantages
         # implementation choice: \hat{R} and \hat{A} are computed at this stage instead of
