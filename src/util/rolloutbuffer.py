@@ -67,7 +67,8 @@ class RolloutBuffer:
 
         # Normalize advantages
         advantages_tensor = torch.stack(self.advantages)
-        advantages_tensor = (advantages_tensor - advantages_tensor.mean()) / (advantages_tensor.std() + 1e-8)
+        if len(advantages_tensor.shape) > 1:    # Normalization can only be done if mini batchsize >= 1
+            advantages_tensor = (advantages_tensor - advantages_tensor.mean()) / (advantages_tensor.std() + 1e-8)
         self.advantages = list(advantages_tensor)
         # compute returns (TD_target)
         self.returns = [adv.detach() + val.detach() for adv, val in zip(self.advantages, self.values)]

@@ -126,7 +126,7 @@ class PPOAgent(OnPolicyAgent):
         state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
         dist, value, _ = self.policy(state)
         action = dist.sample()
-        log_prob = dist.log_prob(action)
+        log_prob = dist.log_prob(action).sum(dim=-1)
         self.last_log_prob = log_prob
         self.last_value = value
         return action.cpu().numpy().squeeze(0)
@@ -191,8 +191,8 @@ class PPOAgent(OnPolicyAgent):
         for _ in range(self.n_epochs):
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
                 dist, values, _ = self.policy(states)
-                log_probs = dist.log_prob(actions)
-                entropy = dist.entropy().mean()  # Sum over actions before mean
+                log_probs = dist.log_prob(actions).sum(dim=-1, keepdim=True)
+                entropy = dist.entropy().sum(dim=-1).mean()  # Sum over actions before mean
 
                 # Policy loss
                 ratio = torch.exp(log_probs - old_log_probs)  # Note: Subtraction is division in log space.
