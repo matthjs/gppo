@@ -55,7 +55,7 @@ class ActorCriticMLL:
         policy_loss = -self.mll_policy(
             policy_dist,
             actions.squeeze(-1) if do_squeeze else actions,
-            adv=advantages.squeeze(-1), # if do_squeeze else advantages,
+            adv=advantages, #.squeeze(-1), # if do_squeeze else advantages,
             old_log_probs=old_log_probs
         ).mean()
 

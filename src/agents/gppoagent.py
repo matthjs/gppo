@@ -140,7 +140,7 @@ class GPPOAgent(OnPolicyAgent):
         last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
         with torch.no_grad():
             _, value_dist = self.policy(last_state)
-            last_value = value_dist.mean.mean(0)
+            last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
 
         # compute returns and advantages
         # implementation choice: \hat{R} and \hat{A} are computed at this stage instead of

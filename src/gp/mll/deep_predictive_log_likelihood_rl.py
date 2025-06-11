@@ -34,7 +34,8 @@ class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
         deep_log_marginal = self.model.quad_weights.unsqueeze(-1) + base_log_marginal
 
         # Compute deep log probabilities using logsumexp
-        deep_log_prob = deep_log_marginal.logsumexp(dim=0)
+        # The extra unsqueeze is the because the shape of old_log_prob is [batch_siz
+        deep_log_prob = deep_log_marginal.logsumexp(dim=0).unsqueeze(-1)
 
         # Apply advantage weighting - key RL modification
         if 'adv' not in kwargs:
