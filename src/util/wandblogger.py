@@ -63,7 +63,7 @@ class WandbLogger:
         if self.metrics_tracker and self.enabled:
             self.metrics_tracker.plot_all_metrics(num_episodes)
             save_path = self.metrics_tracker.save_path
-            metrics_path = os.path.join(save_path, "metrics.json")   # Also kind off sketchy
+            metrics_path = os.path.join(save_path, "metrics.json")   # Also kind of sketchy
             for metric_name in self.metrics_tracker.metrics_history.keys():
                 self.log_image(metric_name, str(os.path.join(save_path, metric_name)) + ".png")
                 self.save(str(os.path.join(save_path, metric_name)) + ".svg")
