@@ -84,9 +84,9 @@ class ActorCriticMLL:
         loss = policy_loss + self.vf_coef * value_loss + self.ent_coef * entropy_loss
 
         # TODO: Remove this later
-        print("loss:", loss.item())
-        print("policy loss -->", policy_loss.item())
-        print("value loss -->", value_loss.item())
-        print("entropy bonus -->", -entropy_loss.item())
+        # print("loss:", loss.item())
+        # print("policy loss -->", policy_loss.item())
+        # print("value loss -->", value_loss.item())
+        # print("entropy bonus -->", -entropy_loss.item())
 
         return loss, policy_loss, value_loss, -entropy_loss
