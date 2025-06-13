@@ -168,10 +168,18 @@ class GPPOAgent(OnPolicyAgent):
         # Perform update rule
         info: Dict[str, Any] = {}
         losses = []
+        info["value_loss"] = 0.0
+        info["policy_loss"] = 0.0
+        info["entropy"] = 0.0
+        cnt = 0
         for _ in range(self.n_epochs):
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
-                loss = self.objective(states, actions, advantages, returns, old_log_probs)
+                cnt += 1
+                loss, policy_loss, value_loss, entropy = self.objective(states, actions, advantages, returns, old_log_probs)
                 losses.append(loss.item())
+                info["value_loss"] += value_loss.item()
+                info["policy_loss"] += policy_loss.item()
+                info["entropy"] += entropy.item()
                 self.optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
@@ -179,6 +187,9 @@ class GPPOAgent(OnPolicyAgent):
 
         self.rollout_buffer.clear()
         info["loss"] = float(np.mean(losses))
+        info["value_loss"] = info["value_loss"] / cnt
+        info["policy_loss"] = info["policy_loss"] / cnt
+        info["entropy"] = info["entropy"] / cnt
         return info
 
     def save(self, path: str) -> None:

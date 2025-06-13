@@ -55,7 +55,7 @@ class ActorCriticMLL:
             log_probs.append(deep_log.logsumexp(dim=0))
         return -torch.stack(log_probs).mean()
 
-    def __call__(self, states, actions, advantages, returns, old_log_probs) -> torch.Tensor:
+    def __call__(self, states, actions, advantages, returns, old_log_probs) -> tuple:
         """
         """
         # conditionally squeeze()
@@ -76,16 +76,17 @@ class ActorCriticMLL:
             returns.squeeze(-1)
         ).mean()
 
-        entropy_bonus = -torch.mean(-self.mll_policy.last_log_prob)    # Probably need to use approximate entropy
-        # entropy_bonus = -policy_dist.entropy().mean()
+        # entropy_loss is NEGATIVE entropy
+        entropy_loss = -torch.mean(-self.mll_policy.last_log_prob)    # Probably need to use approximate entropy
+        # entropy_bonus = policy_dist.entropy().mean()
 
         # Total loss: policy + value - entropy_bonus
-        loss = policy_loss + self.vf_coef * value_loss + self.ent_coef * entropy_bonus
+        loss = policy_loss + self.vf_coef * value_loss + self.ent_coef * entropy_loss
 
         # TODO: Remove this later
         print("loss:", loss.item())
         print("policy loss -->", policy_loss.item())
         print("value loss -->", value_loss.item())
-        print("entropy bonus -->", entropy_bonus.item())
+        print("entropy bonus -->", -entropy_loss.item())
 
-        return loss
+        return loss, policy_loss, value_loss, -entropy_loss

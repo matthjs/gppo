@@ -190,12 +190,17 @@ class PPOAgent(OnPolicyAgent):
         )
         # optimize policy
         info: Dict[str, Any] = {}
+        info["value_loss"] = 0.0
+        info["policy_loss"] = 0.0
+        info["entropy"] = 0.0
+        cnt = 0
         losses = []
         for _ in range(self.n_epochs):
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
+                cnt += 1
                 dist, values, _ = self.policy(states)
                 log_probs = dist.log_prob(actions).sum(dim=-1, keepdim=True)
-                entropy = dist.entropy().sum(dim=-1).mean()  # Sum over actions before mean
+                entropy_loss = -dist.entropy().sum(dim=-1).mean()  # Sum over actions before mean
 
                 # Policy loss
                 ratio = torch.exp(log_probs - old_log_probs)  # Note: Subtraction is division in log space.
@@ -219,8 +224,12 @@ class PPOAgent(OnPolicyAgent):
                 value_loss = F.mse_loss(returns, value_pred.unsqueeze(-1))
 
                 # Full surrogate loss: L_clip - c1 * L_VF + c_2 S[pi](s_t)
-                loss = policy_loss + self.vf_coef * value_loss - self.ent_coef * entropy
+                loss = policy_loss + self.vf_coef * value_loss + self.ent_coef * entropy_loss
                 losses.append(loss.item())
+
+                info["value_loss"] += value_loss.item()
+                info["policy_loss"] += policy_loss.item()
+                info["entropy"] += -entropy_loss.item()
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -229,6 +238,9 @@ class PPOAgent(OnPolicyAgent):
 
         self.rollout_buffer.clear()
         info["loss"] = float(np.mean(losses))
+        info["value_loss"] = info["value_loss"] / cnt
+        info["policy_loss"] = info["policy_loss"] / cnt
+        info["entropy"] = info["entropy"] / cnt
         return info
 
     def save(self, path: str) -> None:

@@ -9,7 +9,7 @@ agent_params:
     gae_lambda: 0.9366093624383212
     clip_range: 0.3247192026115954
     clip_range_vf: null         # corresponds to Optional[float] = None
-    ent_coef: 0.005
+    ent_coef: 0.000585045
     vf_coef: 0.2719126203097403
     max_grad_norm: 0.7942051282152534
     num_inducing_points: 128
