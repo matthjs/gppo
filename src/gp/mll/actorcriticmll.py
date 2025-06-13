@@ -45,16 +45,6 @@ class ActorCriticMLL:
 
         return False
 
-    # Proper entropy approximation for Gaussian mixture
-    def _estimate_entropy(self, dist, weights, n_samples=10):
-        samples = sample_from_gmm(weights, dist.mean, dist.variance, n_samples)
-        log_probs = []
-        for s in samples:
-            base_log = dist.log_prob(s.unsqueeze(0))  # Implement this
-            deep_log = weights.log() + base_log
-            log_probs.append(deep_log.logsumexp(dim=0))
-        return -torch.stack(log_probs).mean()
-
     def __call__(self, states, actions, advantages, returns, old_log_probs) -> tuple:
         """
         """
