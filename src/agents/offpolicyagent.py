@@ -1,8 +1,7 @@
 from abc import abstractmethod, ABC
 import torch
 import numpy as np
-from typing import Tuple, Callable, Any, Dict, Optional, Union
-
+from typing import Tuple, Callable, Any, Dict, Optional
 from src.agents.agent import Agent
 from src.util.exploration import ExplorationPolicy
 from src.util.replaybuffer import ReplayBuffer
@@ -93,7 +92,6 @@ class OffPolicyAgent(Agent, ABC):
         """
         return self.expl_policy.select_action(observation)
 
-    @abstractmethod
     def update(self, params: Optional[Dict[str, Any]] = None):
         """
         An abstract update method that can be used to update some parts

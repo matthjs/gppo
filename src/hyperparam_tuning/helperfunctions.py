@@ -1,7 +1,6 @@
-from typing import Dict, Any, Union
-from src.agents.agent import Agent
+from typing import Union
 from src.agents.agentfactory import AgentFactory
-from src.util.interaction import agent_env_loop, create_agent_for_catch_env
+from src.util.interaction import create_agent_for_catch_env
 from typing import Dict, Any
 from src.agents.agent import Agent
 from src.util.interaction import agent_env_loop

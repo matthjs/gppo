@@ -16,6 +16,9 @@ from src.agents.ppoagent import PPOAgent
 
 
 class AgentFactory:
+    """
+    Simple factory for creating an agent of agent_type from agent_params.
+    """
     # TODO: Find a better way to do this
     DGP_ARCHITECTURES = {
         0: {

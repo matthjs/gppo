@@ -1,12 +1,10 @@
-from src.agents.dqvagent import DQVAgent
 from typing import Dict, Any, Tuple, Union
 import torch
-
-from src.agents.offpolicyagent import OffPolicyAgent
+from src.agents.dqvagent import DQVAgent
 from src.util.network import DuelingConvNetEstimator, ConvNetEstimator
 
 
-class DQVMaxAgent(OffPolicyAgent):
+class DQVMaxAgent(DQVAgent):
     """
     Deep Quality-Value-Max (DQV-Max) agent.
     """

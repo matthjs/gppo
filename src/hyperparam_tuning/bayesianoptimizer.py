@@ -97,13 +97,6 @@ class BayesianOptimizer:
                 raw_data=metrics[self.objective_name]
             )
 
-            if self.logger:
-                pass
-                # This is really not as useful as it seems.
-                # metrics_with_params = {**params, **metrics}
-                # metrics_with_params.pop('device', None)
-                # self.logger.log(metrics_with_params)
-
         best = self.get_best_parameters()
         if self.logger:
             with open("./results/best_hyperparams.json", "w") as f:

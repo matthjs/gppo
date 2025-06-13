@@ -1,7 +1,6 @@
 from typing import Optional, Dict, Any, Tuple, Callable
 import numpy as np
 import torch
-from src.agents.agent import Agent
 from src.agents.offpolicyagent import OffPolicyAgent
 from src.util.exploration import ExplorationPolicy
 
@@ -18,7 +17,8 @@ class RandomAgent(OffPolicyAgent):
                  expl_policy_factory: Callable[[], ExplorationPolicy] = lambda: -1,
                  device: torch.device = None):
         """
-        Wrapper agent for running the default environment random policy.
+        Wrapper agent for running the default environment random policy which
+        samples uniformly from the action space.
         """
         super().__init__(memory_size, state_dimensions, n_actions, batch_size, learning_rate, discount_factor,
                          expl_policy_factory, device)
@@ -27,7 +27,7 @@ class RandomAgent(OffPolicyAgent):
     def store_transition(
             self,
             state: np.ndarray,
-            action: int,  # Is this always an int?
+            action: int,
             reward: float,
             new_state: np.ndarray,
             done: bool

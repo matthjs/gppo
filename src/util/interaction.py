@@ -1,22 +1,19 @@
-from typing import Optional
 import torch
-import wandb
-
+import gymnasium as gym
+from typing import Optional
 from src.agents.agent import Agent
-from src.agents.gpreinforceagent import GPReinforceAgent
 from src.util.environment import CatchEnv
 from src.agents.agentfactory import AgentFactory
-from src.metrics.metrictracker import MetricsTracker
 from src.util.vecnormalize import VecNormalizeGymEnv
+from src.util.wandblogger import WandbLogger
 
 
 def agent_env_loop(
         agent: Agent,
         num_episodes: int,
-        wandb_logger,
-        # tracker: Optional[MetricsTracker] = None,
+        wandb_logger: WandbLogger,
         learning: bool = True,
-        env=None,
+        env: gym.Env = None,
         verbose: bool = False,
         save_model: bool = False,
         normalize_obs: bool = True
@@ -26,10 +23,12 @@ def agent_env_loop(
 
     :param agent: The RL agent.
     :param num_episodes: Number of training episodes.
-    :param tracker: Optional metrics tracker.
+    :param wandb_logger: Optional wandb logger, can be computed with a MetricTracker.
     :param learning: Whether to train the agent (True) or just evaluate (False).
     :param env: Optional environment. Defaults to CatchEnv.
     :param verbose: If True, prints per-episode rewards.
+    :param save_model:
+    :param normalize_obs:
     :return: Average return over all episodes.
     """
     print("Running agent on environment...")
@@ -54,36 +53,20 @@ def agent_env_loop(
                 if learning:
                     agent.store_transition(obs, action, reward, next_obs, terminated or truncated)
                     agent.update()
-                    if not isinstance(agent, GPReinforceAgent):
-                        learning_info = agent.learn()
-                        if learning_info and wandb_logger:
-                            wandb_logger.log(learning_info, agent_id=type(agent).__name__,
-                                             episode=episode)
-                        # if tracker and learning_info:
-                        #     for key, value in learning_info.items():
-                        #        tracker.record_metric(key, agent_id=type(agent).__name__,
-                        #                              episode_idx=episode, value=value)
-
+                    learning_info = agent.learn()
+                    if learning_info and wandb_logger:
+                        wandb_logger.log(learning_info, agent_id=type(agent).__name__,
+                                            episode=episode)
                 episode_return += reward
                 obs = next_obs
 
                 if terminated or truncated:
-                    # This is akward but for now acceptable
-                    # if isinstance(agent, GPReinforceAgent):
-                    #     learning_info = agent.learn()
-                    #     if tracker and learning_info:
-                    #         for key, value in learning_info.items():
-                    #            tracker.record_metric(key, agent_id=type(agent).__name__,
-                    #                                  episode_idx=episode, value=value)
-
                     if verbose:
                         print(f"episode {episode} | reward: {episode_return}")
 
                     if wandb_logger:
                         wandb_logger.log({"return": episode_return}, agent_id=type(agent).__name__,
                                          episode=episode)
-                    # tracker.record_metric("return", agent_id=type(agent).__name__,
-                    #                          episode_idx=episode, value=episode_return)
                     total_return += episode_return
                     break
     except KeyboardInterrupt:

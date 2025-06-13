@@ -1,10 +1,8 @@
 from typing import List, Dict, Tuple, Any
-
 import torch
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.likelihoods import MultitaskGaussianLikelihood, GaussianLikelihood
 from torch import Tensor
-
 from src.gp.deepgplayers import DSPPHiddenLayer
 from src.gp.deepsigma import DSPPModel
 
@@ -22,10 +20,14 @@ class ActorCriticDGP(DSPPModel):
         **kwargs
     ):
         """
-        DGP-based policy and value network for RL
+        Policy and value Deep Gaussian Process for RL.
+        Models two distributions, one for the policy and one for the value function.
 
-        :param action_dim: Dimension of action space
-        :param value_dim: Dimension of value output (default 1)
+        :param input_dim: Dimensionality of the input space
+        :param action_dim: Dimensionality of action space
+        :param Q: Number of quadrature sites
+        :param num_inducing_points: Number of inducing points
+        :param hidden_layers_config: Configuration for base GP layers
         :param policy_hidden_config: Configuration for policy head layers
         :param value_hidden_config: Configuration for value head layers
         """
@@ -100,7 +102,7 @@ class ActorCriticDGP(DSPPModel):
     def posterior(
             self,
             X: Tensor,
-            apply_likelihood: bool = False,  # Renamed from observation_noise
+            apply_likelihood: bool = False,
             *args, **kwargs) -> Tuple[MultivariateNormal, MultivariateNormal]:
         # This is the same as __call__ but will automatically apply the likelihood
         # Does not implement self.input_transform or self.outcome_transform features.

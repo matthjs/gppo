@@ -3,57 +3,13 @@ Some inspiration taken from the StableBaselines3 implementation:
 https://stable-baselines3.readthedocs.io/en/master/_modules/stable_baselines3/ppo/ppo.html#PPO
 """
 
-from gymnasium import spaces
-
 from src.agents.onpolicyagent import OnPolicyAgent
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.distributions import Normal, Categorical
-from typing import Dict, Any, Tuple, Optional, List
+from typing import Dict, Any, Optional
 from torch.nn import functional as F
-
-class ActorCritic(nn.Module):
-    def __init__(
-            self,
-            input_dim: int,
-            action_dim: int,
-            hidden_sizes: List[int] = [64, 64],
-    ):
-        super().__init__()
-        # build MLP
-        layers = []
-        last_dim = input_dim
-        for h in hidden_sizes:
-            layers.append(nn.Linear(last_dim, h))
-            layers.append(nn.ReLU())
-            last_dim = h
-        self.shared = nn.Sequential(*layers)
-        # actor head
-        # self.action_space = action_space
-        # if isinstance(action_space, spaces.Discrete):
-        #     self.action_head = nn.Linear(last_dim, action_space.n)
-        # else:
-        self.action_mean = nn.Linear(last_dim, action_dim)
-        self.action_log_std = nn.Parameter(torch.zeros(1, action_dim))
-        # critic head
-        self.value_head = nn.Linear(last_dim, 1)
-
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        x = self.shared(x)
-        # value
-        value = self.value_head(x).squeeze(-1)
-        # action distribution
-        # if isinstance(self.action_space, spaces.Discrete):
-        #     logits = self.action_head(x)
-        #     dist = Categorical(logits=logits)
-        #    log_std = None
-        # else:
-        mean = self.action_mean(x)
-        std = torch.exp(self.action_log_std)
-        dist = Normal(mean, std)
-        log_std = self.action_log_std
-        return dist, value, log_std
+from src.util.network import ActorCriticMLP
 
 
 class PPOAgent(OnPolicyAgent):
@@ -105,7 +61,7 @@ class PPOAgent(OnPolicyAgent):
         )
         input_dim = int(np.prod(state_dimensions))
         action_dim = int(np.prod(action_dimensions))
-        self.policy = ActorCritic(
+        self.policy = ActorCriticMLP(
             input_dim=input_dim,
             action_dim=action_dim,
         ).to(self.device)

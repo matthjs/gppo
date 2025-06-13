@@ -2,10 +2,9 @@
 Taken from: Taken from: https://github.com/matthjs/xai-gp/tree/main/xai_gp/models/gp
 """
 import torch
-from gpytorch.mlls import VariationalELBO, DeepApproximateMLL, ExactMarginalLogLikelihood
+from gpytorch.mlls import VariationalELBO, DeepApproximateMLL
 import time
 from gpytorch.mlls import DeepPredictiveLogLikelihood
-
 from src.gp.gpbase import GPytorchModel
 from src.util.logs import log_training_start, log_epoch_stats, log_training_end
 

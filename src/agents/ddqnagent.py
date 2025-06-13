@@ -1,8 +1,5 @@
 from typing import Tuple
-
 import torch
-from torch import optim
-
 from src.agents.dqnagent import DQNAgent
 
 
@@ -44,8 +41,6 @@ class DDQNAgent(DQNAgent):
         super().__init__(memory_size, state_dimensions, n_actions, batch_size, learning_rate, discount_factor,
                          target_update_freq, expl_policy_name, expl_policy_params, device, dueling_architecture,
                          **kwargs)
-        """
-        """
 
     def compute_td_target(self,
                           rewards,

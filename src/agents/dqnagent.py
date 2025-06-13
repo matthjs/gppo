@@ -1,7 +1,6 @@
 from typing import Tuple, Optional, Dict, Any
 import torch
 from torch import nn, optim
-from src.agents.agent import Agent
 from src.agents.offpolicyagent import OffPolicyAgent
 from src.util.exploration import make_policy
 from src.util.network import ConvNetEstimator, DuelingConvNetEstimator

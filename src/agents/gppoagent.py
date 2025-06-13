@@ -1,11 +1,4 @@
-from typing import Optional, List, Dict, Union, Any
-
-import numpy as np
-import torch
-from gpytorch.likelihoods import MultitaskGaussianLikelihood, GaussianLikelihood
-
-from src.agents.onpolicyagent import OnPolicyAgent
-from src.agents.ppoagent import PPOAgent
+from typing import Union
 from src.gp.acdeepsigma import ActorCriticDGP
 from src.gp.deepsigma import sample_from_gmm
 from src.gp.mll.actorcriticmll import ActorCriticMLL
@@ -13,8 +6,7 @@ from src.agents.onpolicyagent import OnPolicyAgent
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.distributions import Normal, Categorical
-from typing import Dict, Any, Tuple, Optional, List
+from typing import Dict, Any, Optional, List
 
 
 class GPPOAgent(OnPolicyAgent):
@@ -99,9 +91,7 @@ class GPPOAgent(OnPolicyAgent):
 
             quad_weights_log = self.policy.quad_weights.unsqueeze(-1)
             quad_weights = quad_weights_log.exp()
-            # action_dist = self.policy.policy_likelihood(action_dist)
-            # value_dist = self.policy.value_likelihood(value_dist)
-            # action = action_dist.sample().mean(0)
+
             action = sample_from_gmm(quad_weights, action_dist.mean, action_dist.variance, 1)
             # log_prob calculation (specific to DSPPs)
             base_log_marginal = self.policy.policy_likelihood.log_marginal(action, action_dist)
@@ -109,22 +99,20 @@ class GPPOAgent(OnPolicyAgent):
             log_prob = deep_log_marginal.logsumexp(dim=0)
 
             self.last_log_prob = log_prob
-            #self.last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
             self.last_value = sample_from_gmm(quad_weights, value_dist.mean, value_dist.variance, 1) if \
                 self.sample_vf else (quad_weights * value_dist.mean).sum(0)
 
-            action_t = action # .mean(0)
-            if action_t.dim() > 1:
-                return action_t.squeeze(0).cpu().numpy()
+            if action.dim() > 1:
+                return action.squeeze(0).cpu().numpy()
 
-            return action_t.cpu().numpy()
+            return action.cpu().numpy()
 
     def store_transition(
             self,
             state: np.ndarray,
             action: Any,
             reward: float,
-            new_state: np.ndarray,  # Not used but needed for interface compatibility
+            new_state: np.ndarray,
             done: bool,
     ) -> None:
         self.next_state = new_state
@@ -146,13 +134,11 @@ class GPPOAgent(OnPolicyAgent):
         if len(self.rollout_buffer) < self.batch_size:
             return {}
 
-        # Compute last value (this is akward can this be changed?)
+        # Compute last value (this is awkward can this be changed?)
         last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
         with torch.no_grad():
             _, value_dist = self.policy(last_state)
             quad_weights = self.policy.quad_weights.unsqueeze(-1).exp()
-            # value_dist = self.policy.value_likelihood(value_dist)
-            # last_value = value_dist.sample().mean(0) if self.sample_vf else value_dist.mean.mean(0)
             last_value = sample_from_gmm(quad_weights, value_dist.mean, value_dist.variance, 1) if \
                 self.sample_vf else (quad_weights * value_dist.mean).sum(0)
 

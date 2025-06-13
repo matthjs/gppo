@@ -11,6 +11,7 @@ from gpytorch.likelihoods import GaussianLikelihood, SoftmaxLikelihood
 from gpytorch.models.deep_gps import DeepGP
 from torch import Tensor
 from torch.distributions import Categorical
+from src.gp.deepgplayers import DeepGPHiddenLayer
 from src.gp.gpbase import GPytorchModel
 
 

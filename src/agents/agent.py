@@ -1,12 +1,8 @@
 from abc import abstractmethod, ABC
-import torch
 import numpy as np
-from typing import Tuple, Callable, Any, Dict, Optional, Union
-from src.util.exploration import ExplorationPolicy
-from src.util.replaybuffer import ReplayBuffer
+from typing import Any, Dict, Optional, Union
 
 
-# MOVE THIS CLASS TO A SEPERATE FILE
 class Agent(ABC):
     # True interface, no implemented methods or constructor.
     @abstractmethod
@@ -29,7 +25,7 @@ class Agent(ABC):
     def store_transition(
             self,
             state: np.ndarray,
-            action: Union[int, np.ndarray],  # Is this always an int?
+            action: Union[int, np.ndarray],
             reward: float,
             new_state: np.ndarray,
             done: bool
@@ -43,7 +39,6 @@ class Agent(ABC):
         This method should be implemented by the child class.
         Can return a dictionary e.g. {'loss': 0.1}.
         """
-
         pass
 
     def save(self, path: str) -> None:

@@ -41,8 +41,6 @@ def main(cfg: DictConfig):
         if cfg.mode.train:
             for _ in range(cfg.num_runs):
                 env = gym.make(cfg.environment)
-                # if cfg.environment == "InvertedPendulum-v5":
-                #    env = ActionRescaleWrapper(env, new_low=-1, new_high=1)
                 agent = AgentFactory.create_agent(cfg.agent.agent_type, env,
                                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
                 agent_env_loop(agent, cfg.num_episodes, logger, learning=True, env=env, verbose=True,
@@ -59,8 +57,6 @@ def main(cfg: DictConfig):
             print(f"  IQM: {stats['iqm']:.2f} (95% CI: {stats['lower_ci']:.2f}-{stats['upper_ci']:.2f})\n")
 
         logger.log_metric_tracker_state(cfg.num_episodes, cfg.mode.export_metrics)
-        # if cfg.mode.export_metrics:
-        #    tracker.export_metrics(str(metrics_path))
     elif cfg.mode.name == 'hpo' or cfg.mode.name == 'hpo_gppo':
         env = gym.make(cfg.environment)
         bo = BayesianOptimizer(

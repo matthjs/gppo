@@ -3,23 +3,16 @@ Taken from: Taken from: https://github.com/matthjs/xai-gp/tree/main/xai_gp/model
 """
 import json
 from typing import Any, Dict, List, Union
-import torch
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.likelihoods import GaussianLikelihood, SoftmaxLikelihood
 from gpytorch.models.deep_gps.dspp import DSPP
 from pandas import Categorical
-from torch import Tensor
 import torch.nn as nn
 from src.gp.deepgplayers import DSPPHiddenLayer
 from src.gp.gpbase import GPytorchModel
-import numpy as np
-
-import torch
 from torch import Tensor
-
 import torch
 
-import torch
 
 def sample_from_gmm(weights: torch.Tensor,
                     means: torch.Tensor,
@@ -28,14 +21,12 @@ def sample_from_gmm(weights: torch.Tensor,
     """
     Sample from a Gaussian mixture model with diagonal covariance.
 
-    Args:
-        weights: tensor of shape [Q, 1] or [Q], mixture weights (sum to 1)
-        means: tensor of shape [Q, 1, D] or [Q, 1] (univariate)
-        variances: tensor of shape [Q, 1, D] or [Q, 1]
-        num_samples: number of samples to draw
+    :param weights: tensor of shape [Q, 1] or [Q], mixture weights (sum to 1)
+    :param means: tensor of shape [Q, 1, D] or [Q, 1] (univariate)
+    :param variances: tensor of shape [Q, 1, D] or [Q, 1]
+    :param num_samples: number of samples to draw
 
-    Returns:
-        samples: tensor of shape [num_samples, D] or [num_samples] (univariate)
+    :return: samples: tensor of shape [num_samples, D] or [num_samples] (univariate)
     """
     # Flatten weights to 1D if needed
     weights = weights.squeeze(-1)  # shape [Q]
@@ -44,12 +35,12 @@ def sample_from_gmm(weights: torch.Tensor,
     component_indices = torch.multinomial(weights, num_samples, replacement=True)  # [num_samples]
 
     # Squeeze means/variances dims of 1 if present
-    means = means.squeeze(1)      # [Q, D] or [Q]
+    means = means.squeeze(1)  # [Q, D] or [Q]
     variances = variances.squeeze(1)  # [Q, D] or [Q]
 
     # Gather the selected components' means and variances
-    selected_means = means[component_indices]       # [num_samples, D] or [num_samples]
-    selected_vars = variances[component_indices]    # [num_samples, D] or [num_samples]
+    selected_means = means[component_indices]  # [num_samples, D] or [num_samples]
+    selected_vars = variances[component_indices]  # [num_samples, D] or [num_samples]
 
     std_devs = torch.sqrt(selected_vars)
 
@@ -58,7 +49,6 @@ def sample_from_gmm(weights: torch.Tensor,
     samples = selected_means + eps * std_devs
 
     return samples
-
 
 
 class DSPPModel(DSPP, GPytorchModel):

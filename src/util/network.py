@@ -1,4 +1,6 @@
+from typing import List, Tuple, Optional
 import torch
+from torch.distributions import Normal
 import torch.nn as nn
 import numpy as np
 
@@ -113,4 +115,41 @@ class DuelingConvNetEstimator(ConvNetEstimator):
         return q_vals
 
 
+class ActorCriticMLP(nn.Module):
+    """
+    MLP that approximates both policy and value function. Assumes continuous actions
+    for the policy. Parameterizes the policy as a Multivariate Gaussian with a
+    diagonal covariance matrix.
+    """
+    def __init__(
+            self,
+            input_dim: int,
+            action_dim: int,
+            hidden_sizes: List[int] = [64, 64],
+    ):
+        super().__init__()
+        # build MLP
+        layers = []
+        last_dim = input_dim
+        for h in hidden_sizes:
+            layers.append(nn.Linear(last_dim, h))
+            layers.append(nn.ReLU())
+            last_dim = h
+        self.shared = nn.Sequential(*layers)
+        # actor head
+        self.action_mean = nn.Linear(last_dim, action_dim)
+        self.action_log_std = nn.Parameter(torch.zeros(1, action_dim))
+        # critic head
+        self.value_head = nn.Linear(last_dim, 1)
+
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
+        x = self.shared(x)
+        # value
+        value = self.value_head(x).squeeze(-1)
+        # action distribution
+        mean = self.action_mean(x)
+        std = torch.exp(self.action_log_std)
+        dist = Normal(mean, std)
+        log_std = self.action_log_std
+        return dist, value, log_std
 

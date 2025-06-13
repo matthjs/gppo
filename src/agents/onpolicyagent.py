@@ -1,14 +1,14 @@
 from abc import ABC
-from typing import Union
-
-import numpy as np
 import torch
-
 from src.agents.agent import Agent
 from src.util.rolloutbuffer import RolloutBuffer
 
 
 class OnPolicyAgent(Agent, ABC):
+    """
+    Abstract base class for on-policy RL algorithms.
+    Instantiates a rolloutbuffer that can be used by the child class.
+    """
     def __init__(self,
                  memory_size: int,
                  state_dimensions,

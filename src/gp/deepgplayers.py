@@ -1,5 +1,5 @@
 """
-Taken from: Taken from: Taken from: https://github.com/matthjs/xai-gp/tree/main/xai_gp/models/gp
+Taken from: https://github.com/matthjs/xai-gp/tree/main/xai_gp/models/gp
 """
 from typing import Optional
 import gpytorch

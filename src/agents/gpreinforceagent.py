@@ -1,3 +1,6 @@
+"""
+CURRENTLY DEPRECATED
+"""
 from typing import Dict, Any, Union, List
 
 import gpytorch

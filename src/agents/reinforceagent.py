@@ -1,10 +1,11 @@
+"""
+Implementation of the classic REINFORCE algorithm.
+"""
 from typing import Dict, Any, Union, List
-
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import Normal
-
 from src.agents.onpolicyagent import OnPolicyAgent
 
 
