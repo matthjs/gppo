@@ -36,6 +36,11 @@ class AgentFactory:
             "policy_hidden_config": [{"output_dims": 128, "mean_type": "constant"}],
             "value_hidden_config": [{"output_dims": 128, "mean_type": "constant"}],
         },
+        3: {
+            "hidden_layers_config": [{"output_dims": 6, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": 6, "mean_type": "linear"}],
+            "value_hidden_config": [{"output_dims": None, "mean_type": "constant"}],
+        }
     }
 
     @staticmethod
