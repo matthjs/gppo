@@ -43,15 +43,16 @@ def agent_env_loop(
     total_return = 0.0
 
     start_episode = getattr(agent, "current_episode", 0)
+
+    if normalize_action:
+        env = ActionRescaleWrapper(env, new_low=-1, new_high=1)
+
     if normalize_obs:
         env = VecNormalizeGymEnv(env, norm_obs=True)
         if not learning:
             print("Not training, loading normalization stats")
             env.training = False
             env.load(os.path.join(save_path, "obs_norm_stats.pkl"))
-
-    if normalize_action:
-        env = ActionRescaleWrapper(env, new_low=-1, new_high=1)
 
     if load_model:
         agent.load(os.path.join(save_path, "type(agent).__name__"))

@@ -46,7 +46,8 @@ def main(cfg: DictConfig):
                 agent_env_loop(agent, cfg.num_episodes, logger, learning=True, env=env, verbose=True,
                                save_model=cfg.mode.save_model,
                                normalize_obs=cfg.normalize_obs,
-                               normalize_action=cfg.normalize_act)
+                               normalize_action=cfg.normalize_act,
+                               save_path=cfg.results_save_path)
 
         if not cfg.wandb.use_wandb:
             tracker.plot_all_metrics(num_episodes=cfg.num_episodes)
