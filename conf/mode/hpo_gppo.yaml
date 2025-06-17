@@ -69,8 +69,10 @@ hpo:
         - 1.0
       value_type: float
     - name: max_grad_norm
-      type: fixed
-      value: 0.3
+      type: range
+      bounds:
+        - 0.3
+        - 1.0
       value_type: float
     - name: num_inducing_points
       type: fixed
@@ -82,4 +84,4 @@ hpo:
       value_type: int
   objective_name: "return"
   minimize: false
-  n_trials: 20
+  n_trials: 25

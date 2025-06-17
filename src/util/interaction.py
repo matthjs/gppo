@@ -3,6 +3,7 @@ import os
 import gymnasium as gym
 from typing import Optional
 from src.agents.agent import Agent
+from src.util.actionrescaler import ActionRescaleWrapper
 from src.util.environment import CatchEnv
 from src.agents.agentfactory import AgentFactory
 from src.util.vecnormalize import VecNormalizeGymEnv
@@ -19,6 +20,7 @@ def agent_env_loop(
         save_model: bool = False,
         load_model: bool = False,
         normalize_obs: bool = True,
+        normalize_action: bool = True,
         save_path: str = "./"
 ) -> float:
     """
@@ -47,6 +49,9 @@ def agent_env_loop(
             print("Not training, loading normalization stats")
             env.training = False
             env.load(os.path.join(save_path, "obs_norm_stats.pkl"))
+
+    if normalize_action:
+        env = ActionRescaleWrapper(env, new_low=-1, new_high=1)
 
     if load_model:
         agent.load(os.path.join(save_path, "type(agent).__name__"))

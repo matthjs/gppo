@@ -1,6 +1,9 @@
 import gymnasium as gym
 import numpy as np
 
+from src.util.vecnormalize import VecNormalizeGymEnv
+
+
 class ActionRescaleWrapper(gym.ActionWrapper):
     def __init__(self, env, new_low=-1.0, new_high=1.0):
         super().__init__(env)
@@ -17,5 +20,19 @@ class ActionRescaleWrapper(gym.ActionWrapper):
 
 if __name__ == "__main__":
     env = gym.make("InvertedPendulum-v4")
+
+    print("Original action space:", env.action_space)
+
+    # Wrap the environment with both wrappers
     env = ActionRescaleWrapper(env, new_low=-1, new_high=1)
-    print(env.action_space)
+    env = VecNormalizeGymEnv(env)
+
+    print("Rescaled action space:", env.action_space)
+    print("Original action space:", env.norm_obs)
+
+    obs, info = env.reset()
+    for _ in range(3):
+        action = env.action_space.sample()  # From [-1, 1]
+        obs, reward, terminated, truncated, info = env.step(action)
+        if terminated or truncated:
+            break
