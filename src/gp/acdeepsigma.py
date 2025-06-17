@@ -17,7 +17,7 @@ class ActorCriticDGP(DSPPModel):
         num_inducing_points,
         policy_hidden_config: List[Dict],
         value_hidden_config: List[Dict] = None,
-        jitter: float = 1e-2
+        jitter: float = 1e-2,
         **kwargs
     ):
         """
