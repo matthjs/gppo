@@ -1,5 +1,6 @@
 from typing import List, Dict, Tuple, Any
 import torch
+import gpytorch
 from gpytorch.distributions import MultivariateNormal
 from gpytorch.likelihoods import MultitaskGaussianLikelihood, GaussianLikelihood
 from torch import Tensor
