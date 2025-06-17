@@ -17,6 +17,7 @@ class ActorCriticDGP(DSPPModel):
         num_inducing_points,
         policy_hidden_config: List[Dict],
         value_hidden_config: List[Dict] = None,
+        jitter: float = 1e-2
         **kwargs
     ):
         """
@@ -39,6 +40,7 @@ class ActorCriticDGP(DSPPModel):
         # value_hidden_config take in out_dim and output dim=1
         self.policy_likelihood = GaussianLikelihood() if num_actions == 1 else MultitaskGaussianLikelihood(num_actions)
         self.value_likelihood = GaussianLikelihood()
+        self.jitter = jitter
 
         # Policy head configuration
         self.policy_head = torch.nn.ModuleList()
@@ -78,18 +80,19 @@ class ActorCriticDGP(DSPPModel):
         This method will output TWO distributions, one for the policy and one
         for the value function.
         """
-        latent_dist = super().forward(inputs, **kwargs)
-        # Pass base features to policy and value function head
-        policy_x = latent_dist
-        value_x = latent_dist
+        with gpytorch.settings.cholesky_jitter(self.jitter):
+            latent_dist = super().forward(inputs, **kwargs)
+            # Pass base features to policy and value function head
+            policy_x = latent_dist
+            value_x = latent_dist
 
-        for layer in self.policy_head:
-            policy_x = layer(policy_x, **kwargs)
+            for layer in self.policy_head:
+                policy_x = layer(policy_x, **kwargs)
 
-        for layer in self.value_head:
-            value_x = layer(value_x, **kwargs)
+            for layer in self.value_head:
+                value_x = layer(value_x, **kwargs)
 
-        return policy_x, value_x
+            return policy_x, value_x
 
     def get_policy(self, inputs: Tensor) -> MultivariateNormal:
         """Get policy distribution only"""

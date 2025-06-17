@@ -1,16 +1,16 @@
 agent_type: "GPPO"
 
 agent_params:
-    memory_size: 64
-    batch_size: 64
-    learning_rate: 0.00050222425
+    memory_size: 32
+    batch_size: 32
+    learning_rate: 0.01
     n_epochs: 5
     gamma: 0.999
-    gae_lambda: 0.9
-    clip_range: 0.4
+    gae_lambda: 0.936609
+    clip_range: 0.1
     clip_range_vf: null         # corresponds to Optional[float] = None
-    ent_coef: 1.37976e-02
-    vf_coef: 0.59816
+    ent_coef: 0.059813
+    vf_coef: 1.0
     max_grad_norm: 0.3
     num_inducing_points: 256
     num_quad_sites: 8

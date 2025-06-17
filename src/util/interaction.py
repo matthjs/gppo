@@ -1,4 +1,5 @@
 import torch
+import os
 import gymnasium as gym
 from typing import Optional
 from src.agents.agent import Agent
@@ -16,7 +17,9 @@ def agent_env_loop(
         env: gym.Env = None,
         verbose: bool = False,
         save_model: bool = False,
-        normalize_obs: bool = True
+        load_model: bool = False,
+        normalize_obs: bool = True,
+        save_path: str = "./"
 ) -> float:
     """
     Run the environment-agent interaction loop.
@@ -40,6 +43,13 @@ def agent_env_loop(
     start_episode = getattr(agent, "current_episode", 0)
     if normalize_obs:
         env = VecNormalizeGymEnv(env, norm_obs=True)
+        if not learning:
+            print("Not training, loading normalization stats")
+            env.training = False
+            env.load(os.path.join(save_path, "obs_norm_stats.pkl"))
+
+    if load_model:
+        agent.load(os.path.join(save_path, "type(agent).__name__"))
 
     try:
         for episode in range(start_episode, start_episode + num_episodes):
@@ -71,8 +81,10 @@ def agent_env_loop(
                     break
     except KeyboardInterrupt:
         print("Training interrupted by user!")
-        if save_model:
-            print("TODO, implement saving the model.")
+    if save_model:
+        agent.save(os.path.join(save_path, "type(agent).__name__"))
+    if normalize_obs:
+        env.save(os.path.join(save_path, "obs_norm_stats.pkl"))
 
     env.close()
     return total_return / num_episodes

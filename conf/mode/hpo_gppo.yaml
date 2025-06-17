@@ -28,7 +28,7 @@ hpo:
       value_type: float
     - name: num_eval_episodes
       type: fixed
-      value: 15
+      value: 50
       value_type: int
     - name: learning_rate
       type: range

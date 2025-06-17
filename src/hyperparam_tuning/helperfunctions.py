@@ -7,7 +7,8 @@ from src.util.interaction import agent_env_loop
 import gymnasium as gym
 
 
-def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env) -> Dict[str, float]:
+def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
+                   normalize_obs: bool = True) -> Dict[str, float]:
     """
     Train the RL agent with the given hyperparameters.
 
@@ -23,11 +24,13 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env) -> Dict[s
         learning=True,
         env=env,
         verbose=params.get("verbose", False),
+        normalize_obs=normalize_obs
     )
     return {"train/avg_return": avg_return}
 
 
-def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env) -> Dict[str, float]:
+def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
+                  normalize_obs: bool = True) -> Dict[str, float]:
     """
     Evaluate the RL agent (no learning updates).
 
@@ -43,6 +46,7 @@ def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env) -> Dict[st
         learning=False,
         env=env,
         verbose=params.get("verbose", False),
+        normalize_obs=normalize_obs
     )
     return {"return": avg_return}
 
