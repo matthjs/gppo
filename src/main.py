@@ -40,6 +40,8 @@ def main(cfg: DictConfig):
 
         if cfg.mode.train:
             for _ in range(cfg.num_runs):
+                # Log each run
+                logger.start()
                 env = gym.make(cfg.environment)
                 agent = AgentFactory.create_agent(cfg.agent.agent_type, env,
                                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
@@ -48,6 +50,8 @@ def main(cfg: DictConfig):
                                normalize_obs=cfg.normalize_obs,
                                normalize_action=cfg.normalize_act,
                                save_path=cfg.results_save_path)
+                logger.log_metric_tracker_state(cfg.num_episodes, cfg.mode.export_metrics)
+                logger.finish()
 
         if not cfg.wandb.use_wandb:
             tracker.plot_all_metrics(num_episodes=cfg.num_episodes)
@@ -58,8 +62,9 @@ def main(cfg: DictConfig):
             print(f"  Final Episode: {stats['episode']}")
             print(f"  IQM: {stats['iqm']:.2f} (95% CI: {stats['lower_ci']:.2f}-{stats['upper_ci']:.2f})\n")
 
-        logger.log_metric_tracker_state(cfg.num_episodes, cfg.mode.export_metrics)
+
     elif cfg.mode.name == 'hpo' or cfg.mode.name == 'hpo_gppo':
+        logger.start()
         env = gym.make(cfg.environment)
         bo = BayesianOptimizer(
             search_space=OmegaConf.to_container(cfg.mode.hpo.search_space, resolve=True),
@@ -73,7 +78,7 @@ def main(cfg: DictConfig):
         best = bo.optimize(n_trials=cfg.mode.hpo.n_trials)
         print("Best hyperparameters found:", best)
 
-    logger.finish()
+        logger.finish()
 
 
 if __name__ == '__main__':

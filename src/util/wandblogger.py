@@ -21,17 +21,22 @@ class WandbLogger:
         self.config = config
         self.name = name
         self.metrics_tracker = metrics_tracker
+        self.run = None
+        self.runs = 0
+        # self.start()
 
+    def start(self) -> None:
         # Get current date and time
         now = datetime.now()
         formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")
         if self.enabled:
             self.run = wandb.init(
-                project=project,
-                entity=entity,
-                config=config,
-                name=name + "-" + formatted_time
+                project=self.project,
+                entity=self.entity,
+                config=self.config,
+                name=self.name + "-" + formatted_time
             )
+        self.runs += 1
 
     def add_metrics_tracker(self, metrics_tracker: MetricsTracker) -> None:
         self.metrics_tracker = metrics_tracker

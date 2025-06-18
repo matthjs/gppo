@@ -20,7 +20,7 @@ def agent_env_loop(
         save_model: bool = False,
         load_model: bool = False,
         normalize_obs: bool = True,
-        normalize_action: bool = True,
+        normalize_action: bool = False,
         save_path: str = "./"
 ) -> float:
     """

@@ -6,12 +6,12 @@ defaults:
 # Common hyperparameters (can be overridden)
 num_episodes: 2000
 num_bootstrap_samples: 100
-num_runs: 1
+num_runs: 5
 results_save_path: "./results/"
 environment: "InvertedPendulum-v5"  # Walker2d-v5" #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 normalize_obs: True
-normalize_act: True   # Rescale to [-1,1]
+normalize_act: False   # Rescale to [-1,1]
 clip_obs: 10.0 #1.0   #
 
 wandb:
