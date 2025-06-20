@@ -7,8 +7,10 @@ hpo:
       value: "GPPO"
       value_type: str
     - name: architecture_choice
-      type: fixed
-      value: 0
+      type: range
+      bounds:
+        - 0
+        - 2
       value_type: int
     - name: batch_size
       type: fixed
@@ -22,7 +24,7 @@ hpo:
       value_type: int
     - name: num_episodes
       type: fixed
-      value: 2000
+      value: 3000
       value_type: int
     - name: beta
       type: fixed
@@ -40,8 +42,10 @@ hpo:
       log_scale: True
       value_type: float
     - name: n_epochs
-      type: fixed
-      value: 5
+      type: range
+      bounds:
+        - 1
+        - 10
       value_type: int
     - name: gamma
       type: fixed
@@ -49,7 +53,7 @@ hpo:
       value_type: float
     - name: gae_lambda
       type: fixed
-      value: 0.9366093624383212
+      value: 0.9
       value_type: float
     - name: clip_range
       type: range
@@ -60,7 +64,7 @@ hpo:
     - name: ent_coef
       type: range
       bounds:
-        - 1e-4
+        - 1e-7
         - 1e-1
       log_scale: True
       value_type: float
@@ -73,12 +77,14 @@ hpo:
     - name: max_grad_norm
       type: range
       bounds:
-        - 0.3
+        - 0.2
         - 1.0
       value_type: float
     - name: num_inducing_points
-      type: fixed
-      value: 256
+      type: range
+      bounds:
+        - 128
+        - 256
       value_type: int
     - name: num_quad_sites
       type: fixed
@@ -86,4 +92,4 @@ hpo:
       value_type: int
   objective_name: "return"
   minimize: false
-  n_trials: 30
+  n_trials: 50

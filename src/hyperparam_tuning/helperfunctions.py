@@ -8,7 +8,10 @@ import gymnasium as gym
 
 
 def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
-                   normalize_obs: bool = True) -> Dict[str, float]:
+                   normalize_obs: bool = True,
+                   early_stop_check: int = None,
+                   early_stop_window: int = None,
+                   early_stop_threshold: float = None) -> Dict[str, float]:
     """
     Train the RL agent with the given hyperparameters.
 

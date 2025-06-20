@@ -1,3 +1,5 @@
+from collections import deque
+
 import torch
 import os
 import gymnasium as gym
@@ -21,7 +23,10 @@ def agent_env_loop(
         load_model: bool = False,
         normalize_obs: bool = True,
         normalize_action: bool = False,
-        save_path: str = "./"
+        save_path: str = "./",
+        early_stop_check: int = None,
+        early_stop_window: int = None,
+        early_stop_threshold: float = None
 ) -> float:
     """
     Run the environment-agent interaction loop.
@@ -57,6 +62,8 @@ def agent_env_loop(
     if load_model:
         agent.load(os.path.join(save_path, "type(agent).__name__"))
 
+    reward_buffer = deque(maxlen=early_stop_window) if early_stop_window else None
+
     try:
         for episode in range(start_episode, start_episode + num_episodes):
             episode_return = 0
@@ -84,7 +91,19 @@ def agent_env_loop(
                         wandb_logger.log({"return": episode_return}, agent_id=type(agent).__name__,
                                          episode=episode)
                     total_return += episode_return
+
+                    if reward_buffer is not None:
+                        reward_buffer.append(episode_return)
+                        if early_stop_check and (episode + 1) % early_stop_check == 0:
+                            avg_recent = sum(reward_buffer) / len(reward_buffer)
+                            if avg_recent < early_stop_threshold:
+                                print(f"Early stopping at episode {episode + 1} — "
+                                      f"Average return over last {early_stop_window} episodes: {avg_recent:.2f} "
+                                      f"(threshold: {early_stop_threshold})")
+                                raise StopIteration
                     break
+    except StopIteration:
+        print("Early stopping triggered!")
     except KeyboardInterrupt:
         print("Training interrupted by user!")
     if save_model:
@@ -93,7 +112,7 @@ def agent_env_loop(
         env.save(os.path.join(save_path, "obs_norm_stats.pkl"))
 
     env.close()
-    return total_return / num_episodes
+    return total_return / num_episodes - start_episode + 1
 
 
 def create_agent_for_catch_env(agent_type: str, num_episodes: int, agent_params: Optional[dict] = None) -> Agent:

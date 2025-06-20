@@ -69,7 +69,10 @@ def main(cfg: DictConfig):
         bo = BayesianOptimizer(
             search_space=OmegaConf.to_container(cfg.mode.hpo.search_space, resolve=True),
             model_factory=partial(create_rl_agent, env=env),
-            train_fn=partial(train_rl_agent, env=env),
+            train_fn=partial(train_rl_agent, env=env,
+                             early_stop_check=cfg.early_stopping.early_stop_check if cfg.early_stopping.enable else None,
+                             early_stop_window=cfg.early_stopping.early_stop_window if cfg.early_stopping.enable else None,
+                             early_stop_threshold=cfg.early_stopping.early_stop_threshold if cfg.early_stopping.enable else None),
             eval_fn=partial(eval_rl_agent, env=env),
             objective_name=cfg.mode.hpo.objective_name,
             minimize=cfg.mode.hpo.minimize,
