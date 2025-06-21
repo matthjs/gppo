@@ -27,7 +27,10 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
         learning=True,
         env=env,
         verbose=params.get("verbose", False),
-        normalize_obs=normalize_obs
+        normalize_obs=normalize_obs,
+        early_stop_check=early_stop_check,
+        early_stop_window=early_stop_window,
+        early_stop_threshold=early_stop_threshold
     )
     return {"train/avg_return": avg_return}
 

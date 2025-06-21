@@ -1,6 +1,6 @@
 defaults:
-  - mode: hpo_gppo # Set a default mode value, it can be overridden by command-line args
-  - agent: gppo
+  - mode: train # Set a default mode value, it can be overridden by command-line args
+  - agent: ppo
   - _self_
 
 # Common hyperparameters (can be overridden)

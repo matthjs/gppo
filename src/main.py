@@ -49,7 +49,10 @@ def main(cfg: DictConfig):
                                save_model=cfg.mode.save_model,
                                normalize_obs=cfg.normalize_obs,
                                normalize_action=cfg.normalize_act,
-                               save_path=cfg.results_save_path)
+                               save_path=cfg.results_save_path,
+                               early_stop_check=cfg.early_stopping.early_stop_check if cfg.early_stopping.enable else None,
+                               early_stop_window=cfg.early_stopping.early_stop_window if cfg.early_stopping.enable else None,
+                               early_stop_threshold=cfg.early_stopping.early_stop_threshold if cfg.early_stopping.enable else None)
                 logger.log_metric_tracker_state(cfg.num_episodes, cfg.mode.export_metrics)
                 logger.finish()
 
