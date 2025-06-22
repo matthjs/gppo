@@ -193,7 +193,7 @@ class GPPOAgent(OnPolicyAgent):
                 'ent_coef': self.ent_coef,
                 'vf_coef': self.vf_coef,
                 'max_grad_norm': self.max_grad_norm,
-                'num_inducing_points': self.policy.num_inducing,
+                'num_inducing_points': self.policy.num_inducing_points,
                 'num_quad_sites': self.policy.Q,
             }
         }, path)

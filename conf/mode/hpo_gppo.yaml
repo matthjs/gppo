@@ -9,22 +9,20 @@ hpo:
     - name: architecture_choice
       type: range
       bounds:
-        - 0
-        - 2
+        - 3
+        - 5
       value_type: int
     - name: batch_size
       type: fixed
       value: 512
       value_type: int
     - name: memory_size
-      type: range
-      bounds:
-        - 32
-        - 256
+      type: fixed
+      value: 512
       value_type: int
     - name: num_episodes
       type: fixed
-      value: 3000
+      value: 10000
       value_type: int
     - name: beta
       type: fixed
@@ -81,10 +79,8 @@ hpo:
         - 1.0
       value_type: float
     - name: num_inducing_points
-      type: range
-      bounds:
-        - 128
-        - 256
+      type: fixed
+      value: 128
       value_type: int
     - name: num_quad_sites
       type: fixed
@@ -92,4 +88,4 @@ hpo:
       value_type: int
   objective_name: "return"
   minimize: false
-  n_trials: 50
+  n_trials: 30

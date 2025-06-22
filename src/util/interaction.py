@@ -16,6 +16,7 @@ def agent_env_loop(
         agent: Agent,
         num_episodes: int,
         wandb_logger: WandbLogger,
+        run_id: int = 0,
         learning: bool = True,
         env: gym.Env = None,
         verbose: bool = False,
@@ -107,7 +108,8 @@ def agent_env_loop(
     except KeyboardInterrupt:
         print("Training interrupted by user!")
     if save_model:
-        agent.save(os.path.join(save_path, "type(agent).__name__"))
+        print(f"Saving agent ...")
+        agent.save(os.path.join(save_path, type(agent).__name__) + env.spec.id + "run_" + str(run_id) + ".pt")
     if normalize_obs:
         env.save(os.path.join(save_path, "obs_norm_stats.pkl"))
 

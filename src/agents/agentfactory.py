@@ -19,7 +19,6 @@ class AgentFactory:
     """
     Simple factory for creating an agent of agent_type from agent_params.
     """
-    # TODO: Find a better way to do this
     DGP_ARCHITECTURES = {
         0: {
             "hidden_layers_config": [{"output_dims": 1, "mean_type": "linear"}],
@@ -40,20 +39,23 @@ class AgentFactory:
             "value_hidden_config": [{"output_dims": 1, "mean_type": "linear"},
                                     {"output_dims": None, "mean_type": "constant"}],
         },
-        8: {
-            "hidden_layers_config": [{"output_dims": 64, "mean_type": "linear"}],
-            "policy_hidden_config": [{"output_dims": 64, "mean_type": "linear"}],
-            "value_hidden_config": [{"output_dims": 64, "mean_type": "linear"}],
-        },
-        9: {
-            "hidden_layers_config": [{"output_dims": 128, "mean_type": "constant"}],
-            "policy_hidden_config": [{"output_dims": 128, "mean_type": "constant"}],
-            "value_hidden_config": [{"output_dims": 128, "mean_type": "constant"}],
-        },
-        10: {
+        3: {
             "hidden_layers_config": [{"output_dims": 6, "mean_type": "linear"}],
-            "policy_hidden_config": [{"output_dims": 6, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": 6, "mean_type": "constant"}],
             "value_hidden_config": [{"output_dims": None, "mean_type": "constant"}],
+        },
+        4: {
+            "hidden_layers_config": [{"output_dims": 1, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": 6, "mean_type": "constant"}],
+            "value_hidden_config": [{"output_dims": None, "mean_type": "constant"}],
+        },
+        5: {
+            "hidden_layers_config": [{"output_dims": 6, "mean_type": "linear"},
+                                     {"output_dims": 6, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": 6, "mean_type": "linear"},
+                                     {"output_dims": 6, "mean_type": "constant"}],
+            "value_hidden_config": [{"output_dims": 1, "mean_type": "linear"},
+                                    {"output_dims": None, "mean_type": "constant"}],
         }
     }
 

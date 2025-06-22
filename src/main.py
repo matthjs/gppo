@@ -39,13 +39,13 @@ def main(cfg: DictConfig):
         logger.add_metrics_tracker(tracker)
 
         if cfg.mode.train:
-            for _ in range(cfg.num_runs):
+            for run_idx in range(cfg.num_runs):
                 # Log each run
                 logger.start()
                 env = gym.make(cfg.environment)
                 agent = AgentFactory.create_agent(cfg.agent.agent_type, env,
                                                   OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
-                agent_env_loop(agent, cfg.num_episodes, logger, learning=True, env=env, verbose=True,
+                agent_env_loop(agent, cfg.num_episodes, logger, run_idx, learning=True, env=env, verbose=True,
                                save_model=cfg.mode.save_model,
                                normalize_obs=cfg.normalize_obs,
                                normalize_action=cfg.normalize_act,
