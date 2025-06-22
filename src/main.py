@@ -2,14 +2,12 @@ import os
 from functools import partial
 import hydra
 import gymnasium as gym
-import wandb
 from omegaconf import DictConfig, OmegaConf
 from src.agents.agentfactory import AgentFactory
-from src.hyperparam_tuning.helperfunctions import create_rl_agent_catch, eval_rl_agent, train_rl_agent, create_rl_agent
+from src.hyperparam_tuning.helperfunctions import eval_rl_agent, train_rl_agent, create_rl_agent
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer
 from src.metrics.metrictracker import MetricsTracker
-from src.util.actionrescaler import ActionRescaleWrapper
-from src.util.interaction import create_agent_for_catch_env, agent_env_loop
+from src.util.interaction import agent_env_loop
 from src.util.wandblogger import WandbLogger
 
 
