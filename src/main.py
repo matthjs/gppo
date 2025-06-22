@@ -1,6 +1,5 @@
 import os
 from functools import partial
-
 import hydra
 import gymnasium as gym
 import wandb

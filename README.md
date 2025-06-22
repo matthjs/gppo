@@ -45,8 +45,30 @@ This project uses [Hydra](https://hydra.cc/) for configuration management. You c
 ```bash
 python main.py 
 ```
+### Reproducing Results
+For `InvertedPendulum-v5` use these exact hyperparameter values:
+```
+
+```
+and this configuration:
+```
+```
+For `Walker2d-v5` use these exact hyperparameter values:
+```
+```
+and this configuration:
+```
+```
 
 ## Information on modules
+* `agents` contains core RL implementations (e.g., `PPO`, `GPPO`) and a factory class for instantiating them.
+* `gp` contains implementations of Deep Gaussian Processes (vanilla and Deep Sigma Point Process variant) and also GPPO specific implementation variants and objective functions.
+* `hyperparam_tuning` contains a generic implementation of the Bayesian optimization algorithm and additional helper functions.
+* `metrics` contains `MetricsTracker` class which can be used to aggregate metrics across runs.
+* `util` contains utility functions and classes such as `replaybuffer` and `rolloutbuffer`.
 
 
 # Simulation Recordings
+## Inverted Pendulum
+
+## Walker2d

@@ -2,7 +2,6 @@
 Some inspiration taken from the StableBaselines3 implementation:
 https://stable-baselines3.readthedocs.io/en/master/_modules/stable_baselines3/ppo/ppo.html#PPO
 """
-
 from src.agents.onpolicyagent import OnPolicyAgent
 import numpy as np
 import torch
@@ -13,6 +12,12 @@ from src.util.network import ActorCriticMLP
 
 
 class PPOAgent(OnPolicyAgent):
+    """
+    Implementation of PPO. Note it currently does not support
+    changing the default MLP neural network architecture ([64,64]) (this can easily be changed
+    by adding it as a parameter to the constructor) and does not support discrete action spaces.
+    Additionally, there is no parallel environment execution support.
+    """
     def __init__(
             self,
             state_dimensions,
@@ -28,13 +33,12 @@ class PPOAgent(OnPolicyAgent):
             ent_coef: float = 0.0,
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
-            target_kl: Optional[float] = None,
             device: torch.device = torch.device("cpu"),
             **kwargs
     ):
         """
-        :param state_dimensions:
-        :param action_dim
+        :param state_dimensions: Shape of the input state.
+        :param action_dimensions: Shape of the actions.
         :memory: amount of steps in the environment to store before updating. Equal to the n_steps param
         in the StableBaselines3 implementation
         :param batch_size: Minibatch size
@@ -106,21 +110,6 @@ class PPOAgent(OnPolicyAgent):
             self.last_log_prob.detach(),
             self.last_value.detach(),
         )
-
-    def _early_kl_stop(self, log_prob, old_log_prob) -> bool:
-        """
-        NOTE TO SELF: THIS IS NOT FINISHED SO DO NOT USE.
-        Determines whether optimization loop should stop early using
-        approximate form of reverse KL divergence.
-        """
-        approx_kl_divs = []
-
-        with torch.no_grad():
-            log_ratio = log_prob - old_log_prob
-            approx_kl_div = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
-            approx_kl_divs.append(approx_kl_div)
-
-        return True
 
     def learn(self) -> Dict[str, Any]:
         """

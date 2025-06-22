@@ -3,6 +3,17 @@ import torch
 
 
 class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
+    """
+    Extension of DeepPredictiveLogLikelihood for policy gradient updates with PPO-style clipping.
+
+    Adds advantage weighting and clipping of probability ratios.
+
+    :param likelihood: Likelihood function for action outputs.
+    :param model: Deep Gaussian Process model.
+    :param num_data: Number of data points.
+    :param clip_range: PPO clipping range.
+    :param beta: Temperature parameter for the posterior approximation.
+    """
     def __init__(self, likelihood, model, num_data, clip_range, beta):
         super().__init__(likelihood, model, num_data, beta)
         self.clip_range = clip_range
@@ -10,14 +21,15 @@ class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
 
     def _log_likelihood_term(self, approximate_dist_f, target, **kwargs):
         """
-        Modified log likelihood term for RL policy gradient updates.
-        Incorporates advantage weighting for trajectory optimization.
+        Compute (clipped) advantage-weighted log-likelihood ratios for policy gradient optimization.
 
-        :param approximate_dist_f: DSPP output distribution
-        :param target: Action targets
-        :param kwargs: Must contain 'adv' tensor of advantages
+        :param approximate_dist_f: Output distribution from the DGP policy head.
+        :param target: Actions taken.
+        :param kwargs: Must include:
+            - 'adv': Advantage estimates.
+            - 'old_log_probs': Log-probabilities under the old policy.
 
-        :return: Advantage-weighted log probabilities
+        :return: Advantage-weighted, PPO-clipped surrogate objective.
         """
         # Get base log marginal from Gaussian likelihood
         base_log_marginal = self.likelihood.log_marginal(

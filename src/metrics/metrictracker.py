@@ -249,9 +249,6 @@ class MetricsTracker:
                             zorder=3
                         )
 
-            # Reference line at max return = 1
-            # ax.axhline(y=1, color='black', linestyle='--', linewidth=2, alpha=0.7, label="Max Return")
-
             # Labels, title, legend, and styling
             ax.set_title(
                 title or f'{metric_name.capitalize()} IQM with {int((1 - self.ci_alpha) * 100)}% CI',

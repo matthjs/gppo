@@ -1,5 +1,4 @@
 from collections import deque
-
 import torch
 import os
 import gymnasium as gym
@@ -13,34 +12,42 @@ from src.util.wandblogger import WandbLogger
 
 
 def agent_env_loop(
-        agent: Agent,
-        num_episodes: int,
-        wandb_logger: WandbLogger,
-        run_id: int = 0,
-        learning: bool = True,
-        env: gym.Env = None,
-        verbose: bool = False,
-        save_model: bool = False,
-        load_model: bool = False,
-        normalize_obs: bool = True,
-        normalize_action: bool = False,
-        save_path: str = "./",
-        early_stop_check: int = None,
-        early_stop_window: int = None,
-        early_stop_threshold: float = None
+    agent: Agent,
+    num_episodes: int,
+    wandb_logger: WandbLogger,
+    run_id: int = 0,
+    learning: bool = True,
+    env: gym.Env = None,
+    verbose: bool = False,
+    save_model: bool = False,
+    load_model: bool = False,
+    normalize_obs: bool = True,
+    normalize_action: bool = False,
+    save_path: str = "./",
+    early_stop_check: int = None,
+    early_stop_window: int = None,
+    early_stop_threshold: float = None
 ) -> float:
     """
-    Run the environment-agent interaction loop.
+    Run the agent in the environment for a number of episodes.
 
-    :param agent: The RL agent.
-    :param num_episodes: Number of training episodes.
-    :param wandb_logger: Optional wandb logger, can be computed with a MetricTracker.
-    :param learning: Whether to train the agent (True) or just evaluate (False).
-    :param env: Optional environment. Defaults to CatchEnv.
-    :param verbose: If True, prints per-episode rewards.
-    :param save_model:
-    :param normalize_obs:
-    :return: Average return over all episodes.
+    :param agent: Reinforcement learning agent to train or evaluate.
+    :param num_episodes: Total number of episodes to run.
+    :param wandb_logger: Optional Weights & Biases logger for tracking metrics.
+    :param run_id: Run identifier for model saving.
+    :param learning: If True, perform learning updates.
+    :param env: Optional environment. Defaults to CatchEnv if not provided.
+    :param verbose: If True, print per-episode rewards.
+    :param save_model: If True, save the model after training.
+    :param load_model: If True, load a previously saved model.
+    :param normalize_obs: If True, normalize observations using VecNormalize wrapper.
+    :param normalize_action: If True, rescale actions to [-1, 1].
+    :param save_path: Path for saving model and normalization stats.
+    :param early_stop_check: Frequency (in episodes) to check early stopping.
+    :param early_stop_window: Number of episodes to average for early stopping.
+    :param early_stop_threshold: Threshold for average reward to trigger early stopping.
+
+    :return: Average return across all completed episodes.
     """
     print("Running agent on environment...")
     if not env:

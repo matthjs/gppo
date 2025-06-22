@@ -13,7 +13,17 @@ def conditional_squeeze(x: torch.Tensor) -> bool:
 
 class ActorCriticMLL:
     """
-    Wrapper for RL training loop integration
+    Composite loss wrapper for actor-critic training using a Deep Gaussian Process (DGP) model.
+    Combines policy gradient loss, value prediction loss, and entropy bonus.
+
+    :param model: Actor-critic model returning policy and value distributions.
+    :param policy_likelihood: Likelihood function used for policy learning.
+    :param value_likelihood: Likelihood function used for value function learning.
+    :param num_data: Number of data points (=batch_size in online RL)
+    :param clip_range: PPO clipping parameter.
+    :param vf_coef: Weight for value loss term.
+    :param ent_coef: Weight for entropy regularization.
+    :param beta: Scales KL divergence term between prior and approximate posterior.
     """
 
     def __init__(self,
@@ -49,6 +59,16 @@ class ActorCriticMLL:
                  advantages: torch.Tensor,
                  returns: torch.Tensor,
                  old_log_probs: torch.Tensor) -> tuple:
+        """
+        Compute total PPO-style loss.
+
+        :param states: Batch of input states.
+        :param actions: Taken actions.
+        :param advantages: Estimated advantages.
+        :param returns: Discounted returns (value targets).
+        :param old_log_probs: Log-probabilities under old policy (for PPO).
+        :return: Tuple of (total_loss, policy_loss, value_loss, entropy of policy distribution).
+        """
         # conditionally squeeze()
         # DGP layers with a single output unit expect [batch_shape] targets while
         # D > 1 dimensional targets expect [batch_shape, D]

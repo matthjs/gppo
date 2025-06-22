@@ -1,5 +1,6 @@
-from typing import Tuple
+from typing import Any, Generator
 import torch
+from torch import Tensor
 
 
 class RolloutBuffer:
@@ -10,6 +11,12 @@ class RolloutBuffer:
     """
 
     def __init__(self, capacity: int, device: torch.device) -> None:
+        """
+        Initialize empty buffer.
+
+        :param capacity: Max number of transitions to store.
+        :param device: Torch device to store tensors on.
+        """
         self.states = []
         self.actions = []
         self.log_probs = []
@@ -30,6 +37,16 @@ class RolloutBuffer:
         log_prob=None,
         value=None,
     ) -> None:
+        """
+        Add a transition to the buffer.
+
+        :param state: Observed state.
+        :param action: Action taken.
+        :param reward: Reward received.
+        :param done: Done flag.
+        :param log_prob: Log-probability of action.
+        :param value: Estimated value of state.
+        """
         def ensure_tensor(x, dtype, device):
             if isinstance(x, torch.Tensor):
                 return x.to(dtype=dtype, device=device)
@@ -54,6 +71,13 @@ class RolloutBuffer:
         gamma: float,
         gae_lambda: float,
     ) -> None:
+        """
+        Compute GAE and returns for all stored transitions.
+
+        :param last_value: Value estimate for final state.
+        :param gamma: Discount factor.
+        :param gae_lambda: GAE lambda parameter.
+        """
         # Generalized advantage estimation
         self.advantages = []
         gae = 0
@@ -72,7 +96,13 @@ class RolloutBuffer:
         # compute returns (TD_target)
         self.returns = [adv.detach() + val.detach() for adv, val in zip(self.advantages, self.values)]
 
-    def get(self, batch_size: int) -> Tuple:
+    def get(self, batch_size: int) -> Generator[tuple[Tensor, Tensor, Tensor, Tensor, Tensor], Any, None]:
+        """
+        Yield mini-batches of stored transitions.
+
+        :param batch_size: Size of each mini-batch.
+        :return: Generator of (state, action, log_prob, return, advantage).
+        """
         states = torch.stack(self.states)
         actions = torch.stack(self.actions)
         old_log_probs = torch.stack(self.log_probs)
@@ -90,6 +120,9 @@ class RolloutBuffer:
             )
 
     def clear(self) -> None:
+        """
+        Clear the rollout buffer.
+        """
         self.states.clear()
         self.actions.clear()
         self.log_probs.clear()
@@ -100,4 +133,7 @@ class RolloutBuffer:
         self.advantages.clear()
 
     def __len__(self) -> int:
+        """
+        :return: Number of stored transitions.
+        """
         return len(self.states)

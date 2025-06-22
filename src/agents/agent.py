@@ -10,6 +10,9 @@ class Agent(ABC):
             self,
             observation: np.ndarray
     ) -> Union[int, np.ndarray]:
+        """
+        Based on state/observation, choose an action.
+        """
         pass
 
     def update(self, params: Optional[Dict[str, Any]] = None):
@@ -35,7 +38,7 @@ class Agent(ABC):
     @abstractmethod
     def learn(self) -> Dict[str, Any]:
         """!
-        Update the parameters of the internal networks.
+        Perform learning update.
         This method should be implemented by the child class.
         Can return a dictionary e.g. {'loss': 0.1}.
         """

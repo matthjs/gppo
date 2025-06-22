@@ -1,8 +1,0 @@
-agent_type: "Reinforce"
-
-agent_params:
-    memory_size: 100
-    batch_size: 64
-    learning_rate: 0.001
-    discount_factor: 1    # episodic environment
-    num_epochs: 3
