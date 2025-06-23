@@ -1,14 +1,14 @@
 defaults:
   - mode: train # Set a default mode value, it can be overridden by command-line args
-  - agent: gppo
+  - agent: gppo_walker2d
   - _self_
 
 # Common hyperparameters (can be overridden)
-num_episodes: 4000
+num_episodes: 10000
 num_bootstrap_samples: 100
-num_runs: 5
+num_runs: 3
 results_save_path: "./results/"
-environment: "InvertedPendulum-v5"  # Walker2d-v5" #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
+environment: "Walker2d-v5"  # Walker2d-v5" #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 normalize_obs: True
 normalize_act: False   # Rescale to [-1,1]
