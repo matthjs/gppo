@@ -115,6 +115,8 @@ class PPOAgent(OnPolicyAgent):
         """
         Usage: run the learn() method at every timestep in the environment,
         it will only update the agent once the rollout_buffer has been filled.
+
+        :return: Dictionary with loss and diagnostic statistics.
         """
         self.policy.train()
         # Get last state value for GAE

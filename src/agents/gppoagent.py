@@ -1,15 +1,23 @@
 from typing import Union
-from src.gp.acdeepsigma import ActorCriticDGP
+from src.gp.actorcriticdgp import ActorCriticDGP
 from src.gp.deepsigma import sample_from_gmm
 from src.gp.mll.actorcriticmll import ActorCriticMLL
 from src.agents.onpolicyagent import OnPolicyAgent
 import numpy as np
 import torch
 import torch.nn as nn
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 
 class GPPOAgent(OnPolicyAgent):
+    """
+    Gaussian Process Proximal Policy Optimization (GPPO) agent using a Deep Gaussian Process (DGP) to estimate
+    the policy and value function.
+
+    The algorithm extends PPO by replacing neural network function approximators with Deep Sigma Point Processes (DSPPs),
+    enabling uncertainty-aware learning and well-calibrated policy/value predictions. Advantage estimates can be
+    uncertainty-aware by sampling from the posterior value distribution.
+    """
     def __init__(
             self,
             state_dimensions,
@@ -21,22 +29,43 @@ class GPPOAgent(OnPolicyAgent):
             beta: float = 1.0,
             num_inducing_points: int = 128,
             num_quad_sites: int = 8,
-            memory_size: int = 2048,
-            batch_size: int = 64,
+            memory_size: int = 512,
+            batch_size: int = 128,
             learning_rate: float = 3e-4,
             n_epochs: int = 10,
             gamma: float = 0.99,
             gae_lambda: float = 0.95,
             clip_range: float = 0.2,
-            clip_range_vf: Optional[float] = None,
             ent_coef: float = 0.0,
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
             sample_vf: bool = True,
-            target_kl: Optional[float] = None,
             device: torch.device = torch.device("cpu"),
             **kwargs
     ):
+        """
+        :param state_dimensions: Shape of the state input.
+        :param action_dimensions: Shape of the action output.
+        :param hidden_layers_config: Shared DGP layer config.
+        :param policy_hidden_config: Policy head config.
+        :param value_hidden_config: Value head config.
+        :param beta: KL divergence regularization weight.
+        :param num_inducing_points: Number of inducing points per layer.
+        :param num_quad_sites: Number of sigma points (quadrature sites) used.
+        :param memory_size: Rollout buffer size.
+        :param batch_size: Batch size for updates.
+        :param learning_rate: Learning rate for optimizer.
+        :param n_epochs: Number of epochs per policy update.
+        :param gamma: Discount factor.
+        :param gae_lambda: GAE lambda. Factor for trade-off of bias vs variance for Generalized Advantage Estimator.
+        :param clip_range: PPO clipping range.
+        :param ent_coef: Entropy coefficient.
+        :param vf_coef: Value function loss coefficient.
+        :param max_grad_norm: Max gradient norm for clipping.
+        :param sample_vf: Whether to sample from the value function posterior.
+        :param device: PyTorch device.
+        :param kwargs: Additional arguments (ignored).
+        """
         super().__init__(
             memory_size,
             state_dimensions,
@@ -61,7 +90,6 @@ class GPPOAgent(OnPolicyAgent):
         self.n_epochs = n_epochs
         self.gae_lambda = gae_lambda
         self.clip_range = clip_range
-        self.clip_range_vf = clip_range_vf
         self.ent_coef = ent_coef
         self.vf_coef = vf_coef
         self.max_grad_norm = max_grad_norm
@@ -84,6 +112,15 @@ class GPPOAgent(OnPolicyAgent):
             self,
             observation: np.ndarray
     ) -> Union[int, np.ndarray]:
+        """
+        Select an action from the policy given an observation.
+
+        Samples from the DGP posterior predictive distribution over actions.
+        Stores log-probability and sampled value for use in learning.
+
+        :param observation: Current environment state.
+        :return: Sampled action.
+        """
         self.policy.eval()
         with torch.no_grad():
             state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -115,6 +152,17 @@ class GPPOAgent(OnPolicyAgent):
             new_state: np.ndarray,
             done: bool,
     ) -> None:
+        """
+        Store a transition in the rollout buffer.
+
+        Uses previously computed log-probability and value sample from policy.
+
+        :param state: Current state.
+        :param action: Action taken.
+        :param reward: Reward received.
+        :param new_state: Next state.
+        :param done: Whether episode terminated.
+        """
         self.next_state = new_state
         self.rollout_buffer.push(
             state,
@@ -129,6 +177,12 @@ class GPPOAgent(OnPolicyAgent):
         """
         Usage: run the learn() method at every timestep in the environment,
         it will only update the agent once the rollout-buffer has been filled.
+
+        Computes advantage estimates using sampled value predictions,
+        then performs multiple gradient updates using the clipped PPO style objective
+        with DSPP log-likelihoods and KL regularization.
+
+        :return: Dictionary with loss and diagnostic statistics.
         """
         self.policy.train()
         if len(self.rollout_buffer) < self.batch_size:
