@@ -40,25 +40,56 @@ and
 python3 -m pip install -r requirements.txt
 ```
 
-## Usage
-This project uses [Hydra](https://hydra.cc/) for configuration management. You can edit and use the configuration in `config.yaml` and run the program with:
+## Running the code
+
+This project uses Hydra for configuration management. To run the code:
+
 ```bash
-python main.py 
-```
-### Reproducing Results
-For `InvertedPendulum-v5` use these exact hyperparameter values:
+python main.py mode=train agent=gppo_walker2d  # (or other algorithms) or just `python main.py` for default configs
 ```
 
+The codebase currently supports training, evaluation, and tracking via Weights & Biases. Models can be saved and loaded. The results for each agent (GPPO, PPO, etc.) will be saved in the specified results directory. To reproduce results, ensure that `train.yaml` and `config.yaml` are configured as follows:
+
+---
+
+### train.yaml
+
+```yaml
+name: train
+
+train: True
+load_model: False
+save_model: True
+import_metrics: True
+export_metrics: True
 ```
-and this configuration:
+
+---
+
+### config.yaml
+
+```yaml
+defaults:
+  - mode: train   # Set a default mode value, it can be overridden by command-line args
+  - agent: gppo_walker2d   # Replace with correct algorithm
+  - _self_
+
+num_episodes: 10000
+num_bootstrap_samples: 100
+num_runs: 1
+results_save_path: "./results/"
+environment: "Walker2d-v5"
+
+normalize_obs: True
+normalize_act: False
+clip_obs: 10.0
+
+wandb:
+  project: "gppo-drl"
+  entity: "ml_exp"
+  use_wandb: True   # Disable if you do not want this
 ```
-```
-For `Walker2d-v5` use these exact hyperparameter values:
-```
-```
-and this configuration:
-```
-```
+
 
 ## Information on modules
 * `agents` contains core RL implementations (e.g., `PPO`, `GPPO`) and a factory class for instantiating them.
@@ -68,7 +99,3 @@ and this configuration:
 * `util` contains utility functions and classes such as `replaybuffer` and `rolloutbuffer`.
 
 
-# Simulation Recordings
-## Inverted Pendulum
-
-## Walker2d
