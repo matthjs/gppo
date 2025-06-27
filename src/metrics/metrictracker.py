@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import threading
@@ -8,7 +9,9 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import seaborn as sns
 import matplotlib.patheffects as pe
-
+import wandb
+from wandb.apis.public import Run
+from typing import Callable, Optional, List, Dict
 
 def interquartile_mean(values: List[float]) -> float:
     """
@@ -32,7 +35,7 @@ class MetricsTracker:
     """
 
     def __init__(self,
-                 n_bootstrap: int = 1000,
+                 n_bootstrap: int = 100,
                  ci_alpha: float = 0.05):
         """
         :param n_bootstrap how many bootstrap replicates are used to estimate (1-ci_alpha)*100%
@@ -150,7 +153,7 @@ class MetricsTracker:
                     x_axis_label: str = "Episodes",
                     y_axis_label: str = "Metric Value",
                     title: str = None,
-                    smoothing_window: int = 1,
+                    smoothing_window: int = 50,
                     ribbon: bool = True,
                     err_bars: bool = False) -> None:
         """
@@ -441,20 +444,156 @@ class MetricsTracker:
                     episode_idx = int(episode_idx_str)
                     self._metrics_history[metric_name][agent_id][episode_idx].extend(values)
 
+    def import_and_plot_focus_metrics(self,
+                                      entity: str,
+                                      project: str,
+                                      run_ids: List[str] = None,
+                                      run_filter: dict = None,
+                                      plot_save_dir: str = None):
+        """
+        Import and plot focus metrics from specific WandB runs
+        with step-to-episode reconstruction
+        """
+        focus_metrics = ['entropy', 'value_loss', 'policy_loss', 'return', 'loss']
+
+        # Set save directory
+        original_save_path = self.save_path
+        if plot_save_dir:
+            self.set_save_path(plot_save_dir)
+
+        # Initialize WandB API
+        api = wandb.Api()
+        runs = api.runs(f"{entity}/{project}")
+
+        # Select runs
+        selected_runs = []
+        for run in runs:
+            if run_ids and run.id not in run_ids:
+                continue
+
+            if run_filter:
+                skip = False
+                for key, values in run_filter.items():
+                    run_value = getattr(run, key, [])
+                    if isinstance(run_value, list):
+                        if not any(v in run_value for v in values):
+                            skip = True
+                            break
+                    else:
+                        if run_value not in values:
+                            skip = True
+                            break
+                if skip:
+                    continue
+
+            selected_runs.append(run)
+
+        print(f"Found {len(selected_runs)} runs matching criteria")
+
+        # Import focus metrics with episode reconstruction
+        for run in selected_runs:
+            try:
+                agent_id = run.config.get('agent')
+                data = ast.literal_eval(agent_id)
+                agent_id = data.get('agent_type')
+                history = run.scan_history()
+
+                # Variables for episode reconstruction
+                current_episode = 0
+                episode_metrics = {m: [] for m in focus_metrics}
+                episode_ended = False
+
+                for row in history:
+                    # Detect episode boundaries using return metric
+                    if 'return' in row and row['return'] is not None:
+                        # Finalize current episode
+                        for metric in focus_metrics:
+                            if metric == 'return':
+                                # Use the actual return value
+                                value = row['return']
+                            elif episode_metrics[metric]:
+                                # Use average for other metrics
+                                value = np.mean(episode_metrics[metric])
+                            else:
+                                continue
+
+                            if metric not in self._metrics_history:
+                                self.register_metric(metric)
+
+                            self.record_metric(
+                                metric_name=metric,
+                                agent_id=agent_id,
+                                episode_idx=current_episode,
+                                value=value
+                            )
+
+                        # Reset for next episode
+                        current_episode += 1
+                        episode_metrics = {m: [] for m in focus_metrics}
+                        episode_ended = True
+                    else:
+                        episode_ended = False
+
+                    # Collect step-level metrics
+                    for metric in focus_metrics:
+                        if metric != 'return' and metric in row and isinstance(row[metric], (int, float)):
+                            episode_metrics[metric].append(row[metric])
+
+                # Handle last episode if it wasn't finalized
+                if not episode_ended and any(episode_metrics.values()):
+                    for metric in focus_metrics:
+                        if metric == 'return':
+                            # No return value for last episode - skip
+                            continue
+                        elif episode_metrics[metric]:
+                            value = np.mean(episode_metrics[metric])
+                            if metric not in self._metrics_history:
+                                self.register_metric(metric)
+
+                            self.record_metric(
+                                metric_name=metric,
+                                agent_id=agent_id,
+                                episode_idx=current_episode,
+                                value=value
+                            )
+
+                print(f"Imported {current_episode} episodes from run: {run.name} ({run.id})")
+
+            except Exception as e:
+                print(f"Failed to import run {run.id}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+        # Generate plots for each focus metric
+        for metric in focus_metrics:
+            if metric in self._metrics_history:
+                print(f"Plotting {metric}...")
+                self.plot_metric(
+                    metric_name=metric,
+                    file_name=metric,
+                    x_axis_label="Episodes",
+                    y_axis_label=f"{metric} IQM with 95% CI",
+                    title=" ",
+                )
+
+        # Restore original save path
+        if plot_save_dir:
+            self.set_save_path(original_save_path)
+
+        # Return final metrics for analysis
+        final_results = {}
+        for metric in focus_metrics:
+            if metric in self._metrics_history:
+                final_results[metric] = self.get_final_metrics(metric)
+
+        return final_results
 
 if __name__ == "__main__":
-    # Quick testing maybe move this to test file.
-    tracker = MetricsTracker(n_bootstrap=500)
-    # Simulate logging rewards for 3 agents over 100 episodes with 5 runs each
-    for agent in ['agentA', 'agentB', 'agentC']:
-        for run in range(5):  # simulate 5 independent runs
-            for episode in range(100):
-                reward = np.random.normal(loc=episode * 0.1 + run, scale=1.0)  # example reward
-                tracker.record_metric('return', agent_id=agent, episode_idx=episode, value=reward)
-
-    # Compute and print IQM and 95% CI at episode 50 for agentA
-    iqm, low, high = tracker.get_iqm_ci('return', 'agentA', 50)
-    print(f"Episode 50 IQM for agentA: {iqm:.3f} (95% CI: [{low:.3f}, {high:.3f}])")
-
-    # Save a plot of the return metric
-    tracker.plot_metric('return', file_name='return_plot.png', y_axis_label="return")
+    # Initialize your tracker
+    tracker = MetricsTracker()
+    results = tracker.import_and_plot_focus_metrics(
+        entity="ml_exp",
+        project="gppo-drl",
+        run_ids=["z2glkm4d", "4pkenkhk","aw7c443v", "ulyg11gv" "hsszs7co", "qsxyjwqe"],  # Specific runs you want
+        plot_save_dir="../results"
+    )

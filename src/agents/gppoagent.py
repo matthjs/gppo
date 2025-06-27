@@ -26,7 +26,7 @@ class GPPOAgent(OnPolicyAgent):
             hidden_layers_config: List[Dict],
             policy_hidden_config: List[Dict],
             value_hidden_config: List[Dict],
-            beta: float = 1.0,
+            beta: float = 0.5,
             num_inducing_points: int = 128,
             num_quad_sites: int = 8,
             memory_size: int = 512,
