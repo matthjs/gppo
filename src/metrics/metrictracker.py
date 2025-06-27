@@ -12,6 +12,7 @@ import matplotlib.patheffects as pe
 import wandb
 from wandb.apis.public import Run
 from typing import Callable, Optional, List, Dict
+import traceback
 
 def interquartile_mean(values: List[float]) -> float:
     """
@@ -155,7 +156,8 @@ class MetricsTracker:
                     title: str = None,
                     smoothing_window: int = 50,
                     ribbon: bool = True,
-                    err_bars: bool = False) -> None:
+                    err_bars: bool = False,
+                    agent_order: List[str] = None) -> None:
         """
         Plot the IQM and stratified bootstrap-based CI over episodes for a specific metric across multiple runs,
         using a CI ribbon plus sparse error-bar caps for clarity.
@@ -169,6 +171,13 @@ class MetricsTracker:
 
             # Convert agents to list for index tracking
             agent_items = list(self._metrics_history[metric_name].items())
+            # Sort agents if order is specified
+            if agent_order:
+                order_map = {agent: i for i, agent in enumerate(agent_order)}
+                agent_items.sort(
+                    key=lambda x: order_map.get(x[0], float('inf'))  # Unknown agents last
+                )
+
             num_agents = len(agent_items)
             max_offset = 80  # Maximum horizontal shift (adjust based on x-axis scale)
 
@@ -205,6 +214,8 @@ class MetricsTracker:
 
                 # Create shortened label by removing 'Agent' suffix if present
                 display_label = agent_id.replace("Agent", "") if agent_id.endswith("Agent") else agent_id
+                if display_label == "RANDOM":
+                    display_label = "Random"
 
                 # Plot the main IQM line
                 line, = ax.plot(eps, smooth_iqm_vals, label=display_label, linewidth=2.5, alpha=1, zorder=1)
@@ -561,9 +572,9 @@ class MetricsTracker:
 
             except Exception as e:
                 print(f"Failed to import run {run.id}: {str(e)}")
-                import traceback
                 traceback.print_exc()
 
+        agent_order = ['GPPO', 'PPO', 'RANDOM']  # Define desired order
         # Generate plots for each focus metric
         for metric in focus_metrics:
             if metric in self._metrics_history:
@@ -574,6 +585,7 @@ class MetricsTracker:
                     x_axis_label="Episodes",
                     y_axis_label=f"{metric} IQM with 95% CI",
                     title=" ",
+                    agent_order=agent_order  # Pass the ordering
                 )
 
         # Restore original save path
@@ -594,6 +606,6 @@ if __name__ == "__main__":
     results = tracker.import_and_plot_focus_metrics(
         entity="ml_exp",
         project="gppo-drl",
-        run_ids=["z2glkm4d", "4pkenkhk","aw7c443v", "ulyg11gv" "hsszs7co", "qsxyjwqe"],  # Specific runs you want
+        run_ids=["z2glkm4d", "4pkenkhk", "aw7c443v", "ulyg11gv", "hsszs7co", "qsxyjwqe"],
         plot_save_dir="../results"
     )
