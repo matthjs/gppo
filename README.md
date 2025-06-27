@@ -48,7 +48,7 @@ This project uses Hydra for configuration management. To run the code:
 python main.py mode=train agent=gppo_walker2d  # (or other algorithms) or just `python main.py` for default configs
 ```
 
-The codebase currently supports training, evaluation, and tracking via Weights & Biases. Models can be saved and loaded. The results for each agent (GPPO, PPO, etc.) will be saved in the specified results directory. To reproduce results, ensure that `train.yaml` and `config.yaml` are configured as follows:
+The codebase currently supports training, evaluation, and with optional tracking via Weights & Biases. Models can be saved and loaded. The results for each agent (GPPO, PPO, etc.) will be saved in the specified results directory. To reproduce results, ensure that `train.yaml` and `config.yaml` are configured as follows:
 
 ---
 
