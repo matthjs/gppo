@@ -1,0 +1,14 @@
+agent_type: "PPO"
+
+agent_params:
+    memory_size: 512
+    batch_size: 32
+    learning_rate: 5.05041e-05
+    n_epochs: 20
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.1
+    clip_range_vf: null         # corresponds to Optional[float] = None
+    ent_coef:  0.000585045
+    vf_coef: 0.871923
+    max_grad_norm: 1

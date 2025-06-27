@@ -1,0 +1,91 @@
+name: hpo_gppo
+
+hpo:
+  search_space:
+    - name: agent_type
+      type: fixed
+      value: "GPPO"
+      value_type: str
+    - name: architecture_choice
+      type: range
+      bounds:
+        - 3
+        - 5
+      value_type: int
+    - name: batch_size
+      type: fixed
+      value: 512
+      value_type: int
+    - name: memory_size
+      type: fixed
+      value: 512
+      value_type: int
+    - name: num_episodes
+      type: fixed
+      value: 10000
+      value_type: int
+    - name: beta
+      type: fixed
+      value: 0.5
+      value_type: float
+    - name: num_eval_episodes
+      type: fixed
+      value: 50
+      value_type: int
+    - name: learning_rate
+      type: range
+      bounds:
+        - 1e-5
+        - 1e-2
+      log_scale: True
+      value_type: float
+    - name: n_epochs
+      type: range
+      bounds:
+        - 1
+        - 10
+      value_type: int
+    - name: gamma
+      type: fixed
+      value: 0.999
+      value_type: float
+    - name: gae_lambda
+      type: fixed
+      value: 0.9
+      value_type: float
+    - name: clip_range
+      type: range
+      bounds:
+        - 0.1
+        - 0.4
+      value_type: float
+    - name: ent_coef
+      type: range
+      bounds:
+        - 1e-7
+        - 1e-1
+      log_scale: True
+      value_type: float
+    - name: vf_coef
+      type: range
+      bounds:
+        - 0.2
+        - 1.0
+      value_type: float
+    - name: max_grad_norm
+      type: range
+      bounds:
+        - 0.2
+        - 1.0
+      value_type: float
+    - name: num_inducing_points
+      type: fixed
+      value: 128
+      value_type: int
+    - name: num_quad_sites
+      type: fixed
+      value: 8
+      value_type: int
+  objective_name: "return"
+  minimize: false
+  n_trials: 30

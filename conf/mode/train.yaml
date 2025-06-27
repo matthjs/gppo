@@ -1,0 +1,11 @@
+name: train
+
+train: True
+load_model: False
+save_model: False
+model_path: "../models"   # e.g., /models/gppo/file.pth
+import_metrics: False
+export_metrics: True
+
+normalize_obs: True
+clip_obs: 10.0 #1.0   #

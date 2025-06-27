@@ -1,0 +1,4 @@
+agent_type: "RANDOM"
+
+agent_params:
+  nothing: None
