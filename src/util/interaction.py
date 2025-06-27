@@ -114,11 +114,13 @@ def agent_env_loop(
         print("Early stopping triggered!")
     except KeyboardInterrupt:
         print("Training interrupted by user!")
+    except Exception as e:
+        print(f"General error: {e}")
     if save_model:
         print(f"Saving agent ...")
         agent.save(os.path.join(save_path, type(agent).__name__) + env.spec.id + "run_" + str(run_id) + ".pt")
     if normalize_obs:
-        env.save(os.path.join(save_path, "obs_norm_stats.pkl"))
+        env.save(os.path.join(save_path, type(agent).__name__ + env.spec.id + "run_" + str(run_id) + "obs_norm_stats.pkl"))
 
     env.close()
     return total_return / num_episodes - start_episode + 1
