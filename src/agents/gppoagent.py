@@ -243,7 +243,6 @@ class GPPOAgent(OnPolicyAgent):
                 'n_epochs': self.n_epochs,
                 'gae_lambda': self.gae_lambda,
                 'clip_range': self.clip_range,
-                'clip_range_vf': self.clip_range_vf,
                 'ent_coef': self.ent_coef,
                 'vf_coef': self.vf_coef,
                 'max_grad_norm': self.max_grad_norm,
