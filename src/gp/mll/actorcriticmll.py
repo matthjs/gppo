@@ -1,5 +1,5 @@
 from gpytorch.mlls import DeepPredictiveLogLikelihood
-from src.gp.acdeepsigma import ActorCriticDGP
+from src.gp.actorcriticdgp import ActorCriticDGP
 import torch
 from src.gp.mll.deep_predictive_log_likelihood_rl import PolicyGradientDeepPredictiveLogLikelihood
 
