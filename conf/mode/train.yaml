@@ -2,9 +2,9 @@ name: train
 
 train: True
 load_model: False
-save_model: False
+save_model: True
 model_path: "../models"   # e.g., /models/gppo/file.pth
-import_metrics: False
+import_metrics: True
 export_metrics: True
 
 normalize_obs: True
