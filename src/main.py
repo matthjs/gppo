@@ -26,6 +26,9 @@ def main(cfg: DictConfig):
         name=cfg.mode.name
     )
 
+    if cfg.results_save_path:
+        os.makedirs(cfg.results_save_path, exist_ok=True)
+
     if cfg.mode.name == 'train':
         metrics_path = os.path.join(cfg.results_save_path, "metrics.json")
         tracker = MetricsTracker(n_bootstrap=cfg.num_bootstrap_samples)
