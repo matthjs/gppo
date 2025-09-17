@@ -9,28 +9,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
-# Optional imports
-try:
-    from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecNormalize
-    from stable_baselines3.common.callbacks import BaseCallback
-    from stable_baselines3.common.base_class import BaseAlgorithm
-    SB3_AVAILABLE = True
-except Exception:
-    SubprocVecEnv = None
-    DummyVecEnv = None
-    VecNormalize = None
-    BaseCallback = object
-    BaseAlgorithm = object
-    SB3_AVAILABLE = False
-
-try:
-    import wandb
-    WANDB_AVAILABLE = True
-except Exception:
-    wandb = None
-    WANDB_AVAILABLE = False
-
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecNormalize
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.base_class import BaseAlgorithm
+import wandb
 import numpy as np
+import gymnasium as gym
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -78,7 +63,7 @@ class EnvManager:
 
         self.env_fns = env_fns
         self.n_envs = n_envs
-        self.use_subproc = use_subproc and SB3_AVAILABLE and SubprocVecEnv is not None
+        self.use_subproc = use_subproc and SubprocVecEnv is not None
         self.gamma = gamma
 
         # Normalize observations settings
@@ -121,21 +106,56 @@ class EnvManager:
         return self.vec_env.step(actions)
 
     def close(self) -> None:
-        try:
-            self.vec_env.close()
-        except Exception:
-            pass
+        self.vec_env.close()
 
     def render(self, **kwargs) -> None:
         # Delegate rendering to first env if supported
-        try:
-            return self.vec_env.render(**kwargs)
-        except Exception:
-            return None
+        return self.vec_env.render(**kwargs)
 
-    @contextmanager
-    def context(self):
-        try:
-            yield self
-        finally:
-            self.close()
+
+def make_env():
+    return gym.make("CartPole-v1")  # simple test environment
+
+def test_sb3():
+    manager = EnvManager(env_fn=make_env, n_envs=4, norm_obs=True)
+
+    # SB3 expects a vectorized environment
+    model = PPO("MlpPolicy", manager.vec_env, verbose=1)
+    model.learn(total_timesteps=1000)
+
+    obs = manager.reset()
+    done = np.array([False])
+    while not done.any():
+        action, _ = model.predict(obs)
+        obs, reward, done, info = manager.step(action)
+
+    manager.close()
+
+# Simple main script to test out functionality
+def main():
+    print("=== Single Environment ===")
+    manager = EnvManager(env_fn=make_env, n_envs=1)
+    obs = manager.reset()
+    print("Reset output:", obs)
+
+    done = False
+    while not done:
+        action = np.array([manager.vec_env.action_space.sample()])
+        obs, reward, done, info = manager.step(action)
+    manager.close()
+
+    print("\n=== Multiple Environments ===")
+    manager_multi = EnvManager(env_fn=make_env, n_envs=3, use_subproc=True, norm_obs=True)
+    obs_multi = manager_multi.reset()
+    print("Reset output shape:", obs_multi.shape)
+
+    actions = np.array([manager_multi.vec_env.action_space.sample() for _ in range(3)])
+    obs_multi, rewards, dones, infos = manager_multi.step(actions)
+    print("Step outputs:")
+    print("Observations:", obs_multi)
+    print("Rewards:", rewards)
+    manager_multi.close()
+
+
+if __name__ == "__main__":
+    test_sb3()
