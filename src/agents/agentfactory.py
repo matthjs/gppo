@@ -57,6 +57,7 @@ class AgentFactory:
     @staticmethod
     def create_agent(agent_type: str,
                      env: Union[gym.Env, str],
+                     n_envs: int,
                      agent_params: dict,
                      load_model: bool = False,
                      model_path: Optional[str] = None,
@@ -83,6 +84,7 @@ class AgentFactory:
             "state_dimensions": obs_space.shape,
             "action_dimensions": action_space.shape,
             "device": device,
+            "n_envs": n_envs
         })
 
         agent = None

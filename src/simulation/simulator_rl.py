@@ -92,7 +92,6 @@ class SimulatorRL:
                         logger.info(f"Episode {episodes_finished} finished with return {episode_returns[i]:.2f}")
                         episode_returns[i] = 0.0  # reset for next episode
 
-                # Learning step
                 if training:
                     self.agent.store_transition(obs, actions, rewards, next_obs, dones)
                     self.agent.update()
@@ -142,9 +141,8 @@ def main(cfg: DictConfig):
     for run_idx in range(1):
         logger.start()
         info_env = gym.make(cfg.environment)
-        env_manager = EnvManager(env_fn=lambda: gym.make(cfg.environment), n_envs=8, use_subproc=True, norm_obs=True)
-        agent = AgentFactory.create_agent(cfg.agent.agent_type, info_env,
-                                          OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
+        env_manager = EnvManager(env_fn=lambda: gym.make(cfg.environment), n_envs=1, use_subproc=True, norm_obs=True)
+        agent = AgentFactory.create_agent(cfg.agent.agent_type, info_env, 1, OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
         sim = SimulatorRL(env_manager, agent)
         sim.train(num_episodes=cfg.num_episodes)
 

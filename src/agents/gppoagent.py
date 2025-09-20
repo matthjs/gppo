@@ -29,7 +29,8 @@ class GPPOAgent(OnPolicyAgent):
             beta: float = 0.5,
             num_inducing_points: int = 128,
             num_quad_sites: int = 8,
-            memory_size: int = 512,
+            n_steps: int = 512,
+            n_envs: int = 1,
             batch_size: int = 128,
             learning_rate: float = 3e-4,
             n_epochs: int = 10,
@@ -67,7 +68,7 @@ class GPPOAgent(OnPolicyAgent):
         :param kwargs: Additional arguments (ignored).
         """
         super().__init__(
-            memory_size,
+            n_steps * n_envs,
             state_dimensions,
             action_dimensions,
             batch_size,
@@ -85,6 +86,9 @@ class GPPOAgent(OnPolicyAgent):
             Q=num_quad_sites,
             num_actions=action_dimensions[-1]
         ).to(self.device)
+
+        self.n_steps = n_steps
+        self.n_envs = n_envs
 
         self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.learning_rate)
         self.n_epochs = n_epochs
@@ -106,6 +110,7 @@ class GPPOAgent(OnPolicyAgent):
 
         self.last_log_prob = None
         self.last_value = None
+        self.last_done = None
         self.next_state = None
 
     def choose_action(
@@ -123,7 +128,8 @@ class GPPOAgent(OnPolicyAgent):
         """
         self.policy.eval()
         with torch.no_grad():
-            state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+            # state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
+            state = torch.tensor(observation, dtype=torch.float32, device=self.device)# .unsqueeze(0)
             action_dist, value_dist = self.policy(state)
 
             quad_weights_log = self.policy.quad_weights.unsqueeze(-1)
@@ -138,8 +144,10 @@ class GPPOAgent(OnPolicyAgent):
             self.last_log_prob = log_prob
             self.last_value = sample_from_gmm(quad_weights, value_dist.mean, value_dist.variance, 1) if \
                 self.sample_vf else (quad_weights * value_dist.mean).sum(0)
+            if self.n_envs > 1:   # TODO: Double check later why this is necessary/behavior is different for batch_size/n_envs=1
+                self.last_value = self.last_value.squeeze(0)
 
-            if action.dim() > 1:
+            if action.dim() > 1 and self.n_envs > 1:   # TODO: Double check second condition
                 return action.squeeze(0).cpu().numpy()
 
             return action.cpu().numpy()
@@ -164,6 +172,7 @@ class GPPOAgent(OnPolicyAgent):
         :param done: Whether episode terminated.
         """
         self.next_state = new_state
+        self.last_done = done
         self.rollout_buffer.push(
             state,
             action,
@@ -189,18 +198,22 @@ class GPPOAgent(OnPolicyAgent):
             return {}
 
         # Compute last value (this is awkward can this be changed?)
-        last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        # last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device) # .unsqueeze(0)
         with torch.no_grad():
             _, value_dist = self.policy(last_state)
             quad_weights = self.policy.quad_weights.unsqueeze(-1).exp()
             last_value = sample_from_gmm(quad_weights, value_dist.mean, value_dist.variance, 1) if \
                 self.sample_vf else (quad_weights * value_dist.mean).sum(0)
+            if self.n_envs > 1:
+                last_value = last_value.squeeze(0)
 
         # compute returns and advantages
         # implementation choice: \hat{R} and \hat{A} are computed at this stage instead of
         # one at a time at every step.
         self.rollout_buffer.compute_returns_and_advantages(
             last_value.detach(),
+            self.last_done,
             self.discount_factor,
             self.gae_lambda
         )

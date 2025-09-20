@@ -20,7 +20,7 @@ class OnPolicyAgent(Agent, ABC):
         self.state_dimensions = state_dimensions
         self.action_dimensions = action_dimensions
         self.memory_size = memory_size
-        self.rollout_buffer = RolloutBuffer(capacity=self.memory_size, device=device)
+        self.rollout_buffer = RolloutBuffer(capacity=self.memory_size, obs_shape=state_dimensions, action_shape=action_dimensions, device=device)
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
