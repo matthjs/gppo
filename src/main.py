@@ -7,6 +7,9 @@ from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import eval_rl_agent, train_rl_agent, create_rl_agent
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer
 from src.metrics.metrictracker import MetricsTracker
+from src.simulation.callbacks.metrictrackercallback import MetricTrackerCallback
+from src.simulation.envmanager import EnvManager
+from src.simulation.simulator_rl import SimulatorRL
 from src.util.interaction import agent_env_loop
 from src.util.wandblogger import WandbLogger
 
@@ -41,10 +44,25 @@ def main(cfg: DictConfig):
         if cfg.mode.train:
             for run_idx in range(cfg.num_runs):
                 # Log each run
-                logger.start()
-                env = gym.make(cfg.environment)
-                agent = AgentFactory.create_agent(cfg.agent.agent_type, env,
-                                                  OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
+                info_env = gym.make(cfg.environment)
+                agent = AgentFactory.create_agent(
+                    cfg.agent.agent_type,
+                    info_env,
+                    cfg.n_envs,
+                    OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
+                env_manager = EnvManager(
+                    env_fn=lambda: gym.make(cfg.environment),
+                    n_envs=cfg.n_envs,
+                    use_subproc=True,
+                    norm_obs=cfg.normalize_obs
+                )
+
+                sim = SimulatorRL(env_manager, agent,
+                                  num_episodes=cfg.num_episodes,
+                                  callbacks=[MetricTrackerCallback(tracker)])
+                sim.train()
+                
+                """
                 agent_env_loop(agent, cfg.num_episodes, logger, run_idx, learning=True, env=env, verbose=True,
                                save_model=cfg.mode.save_model,
                                normalize_obs=cfg.normalize_obs,
@@ -55,9 +73,9 @@ def main(cfg: DictConfig):
                                early_stop_threshold=cfg.early_stopping.early_stop_threshold if cfg.early_stopping.enable else None)
                 logger.log_metric_tracker_state(cfg.num_episodes, cfg.mode.export_metrics)
                 logger.finish()
-
-        if not cfg.wandb.use_wandb:
-            tracker.plot_all_metrics(num_episodes=cfg.num_episodes)
+                """
+        # if not cfg.wandb.use_wandb:
+        #    tracker.plot_all_metrics(num_episodes=cfg.num_episodes)
         # After plotting, get final metrics
         final_stats = tracker.get_final_metrics("return")
         for agent, stats in final_stats.items():

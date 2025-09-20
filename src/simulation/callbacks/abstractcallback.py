@@ -1,8 +1,9 @@
 from abc import ABC
+from types import SimpleNamespace
 from typing import Any, Optional
 import pandas as pd
 from src.agents.agent import Agent
-from src.metrics.metricstrackerregistry import MetricsTrackerRegistry
+from src.simulation.simulatorldata import SimulatorRLData
 
 
 class AbstractCallback(ABC):
@@ -27,44 +28,10 @@ class AbstractCallback(ABC):
         self.experiment_id: Optional[str] = None
         self.old_obs: Optional[Any] = None
 
-    def init_callback(self,
-                      experiment_id: str,
-                      mode: str,
-                      agent: Agent,
-                      agent_id: str,
-                      agent_config: Any,
-                      df: pd.DataFrame,
-                      metrics_tracker_registry: MetricsTrackerRegistry,
-                      logging: bool = False,
-                      extra: Optional[Any] = None) -> None:
-        """
-        Initialize the callback with experiment-specific details.
+    def init_callback(self, data: SimulatorRLData) -> None:
+        pass
 
-        :param experiment_id: ID of the experiment.
-        :param mode: Mode of the experiment ("train" or "eval").
-        :param agent: Agent instance.
-        :param agent_id: ID of the agent.
-        :param agent_config: Configuration of the agent.
-        :param df: DataFrame for logging metrics.
-        :param metrics_tracker_registry: Registry for metric trackers.
-        :param logging: Whether to enable logging.
-        :param extra: Additional information.
-        """
-        if mode not in ["train", "eval"]:
-            raise ValueError(f"Invalid mode {mode}.")
-        self.mode = mode
-
-        self.experiment_id = experiment_id
-        self.agent = agent
-        self.agent_id = agent_id
-        self.agent_config = agent_config
-        self.df = df
-        self.metrics_tracker_registry = metrics_tracker_registry
-        self.extra = extra
-        self.old_obs = None
-        self.logging = logging
-
-    def on_step(self, action: Any, reward: float, new_obs: Any, done: bool) -> bool:
+    def on_step(self, action: Any, reward: float, next_obs: Any, done: bool) -> bool:
         """
         Callback for each step of the environment.
 
@@ -75,8 +42,11 @@ class AbstractCallback(ABC):
         :return: Whether to continue the run.
         """
         self.num_steps += 1
-        self.old_obs = new_obs
+        self.old_obs = next_obs
         return True
+    
+    def on_learn(self, learning_info) -> None:
+        pass
 
     def on_episode_end(self) -> None:
         """
