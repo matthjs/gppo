@@ -5,9 +5,8 @@ import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.callbacks import StopTrainingOnMaxEpisodes
 from src.agents.agent import Agent
-from src.metrics.metrictracker import MetricsTracker
 from src.simulation.callbacks.abstractcallback import AbstractCallback
-from src.simulation.callbacks.sbcallbackadapter import StableBaselinesCallbackAdapter
+from src.simulation.callbacks.sbcallbackadapter import SB3CallbackAdapter
 from src.simulation.envmanager import EnvManager
 from src.simulation.simulatorldata import SimulatorRLData
 from src.util.wandblogger import WandbLogger
@@ -17,7 +16,6 @@ import hydra
 import gymnasium as gym
 from omegaconf import DictConfig, OmegaConf
 from src.agents.agentfactory import AgentFactory
-from src.util.interaction import agent_env_loop
 from src.util.wandblogger import WandbLogger
 
 logger = logging.getLogger(__name__)
@@ -46,8 +44,12 @@ class SimulatorRL:
         self.device = device
 
     def _call_callbacks(self, fn_name: str, *args, **kwargs):
+        return_value = True
         for cb in self.callbacks:
-            getattr(cb, fn_name)(*args, **kwargs)
+            ret = getattr(cb, fn_name)(*args, **kwargs)
+            if ret is not None:
+                return_value = return_value and ret
+        return return_value
 
     def train(self) -> None:
         self._call_callbacks("init_callback",
@@ -62,7 +64,7 @@ class SimulatorRL:
         max_episode_callback = StopTrainingOnMaxEpisodes(max_episodes=num_episodes, verbose=0)
         sb_callbacks = [max_episode_callback]
         for callback in self.callbacks:
-            callback.append(StableBaselinesCallbackAdapter(callback))
+            callback.append(SB3CallbackAdapter(callback))
         model = self.agent.stable_baselines_unwrapped()
 
         model.learn(total_timesteps=4242424242424, callback=sb_callbacks)
@@ -86,11 +88,13 @@ class SimulatorRL:
                     if dones[i]:
                         episodes_finished += 1
 
-                self._call_callbacks("on_step",
+                # If return false stop training
+                if not self._call_callbacks("on_step",
                                      action=actions,
                                      reward=rewards,
                                      next_obs=next_obs,
-                                     done=dones)
+                                     done=dones):
+                    break
 
                 if training:
                     self.agent.store_transition(obs, actions, rewards, next_obs, dones)
@@ -105,8 +109,8 @@ class SimulatorRL:
             print("Early stopping triggered!")
         except KeyboardInterrupt:
             print("Training interrupted by user!")
-        except Exception as e:
-            print(f"General error: {e}")
+        # except Exception as e:
+        #    print(f"General error: {e}")
 
         if self.save_model:
             print("Saving agent ... TODO")

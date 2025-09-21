@@ -80,24 +80,35 @@ class RolloutBuffer:
         gae_lambda: float
     ) -> None:
         """
-        Compute GAE and returns for all stored transitions.
+        Compute GAE and returns for all stored transitions in a multi-environment rollout.
 
-        :param last_value: Value estimate for final state.
-        :param last_done: 
+        :param last_value: Value estimate for final states, shape [n_envs].
+        :param last_done: Done flags for final states, shape [n_envs].
         :param gamma: Discount factor.
         :param gae_lambda: GAE lambda parameter.
         """
-        # Append last_values and last_dones for GAE computation
-        values = torch.cat([self.values[:self.pos], last_value.to(self.device)])
-        dones = torch.cat([self.dones[:self.pos], ensure_tensor(last_done, torch.float32, self.device)])
+        # Number of environments
+        n_envs = last_value.shape[0]
+        # Number of timesteps collected
+        T = self.pos // n_envs
+        last_done = ensure_tensor(last_done, torch.float32, self.device)
 
-        gae = 0
-        for t in reversed(range(self.pos)):
-            delta = self.rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]
+        # Reshape flattened buffer into [T, N]
+        rewards = self.rewards[:self.pos].view(T, n_envs)
+        values = torch.cat([self.values[:self.pos].view(T, n_envs), last_value.unsqueeze(0).to(self.device)], dim=0)
+        dones = torch.cat([self.dones[:self.pos].view(T, n_envs), last_done.unsqueeze(0).to(self.device)], dim=0)
+
+        advantages = torch.zeros_like(rewards)
+        gae = torch.zeros(n_envs, device=self.device)
+
+        # Compute GAE backwards
+        for t in reversed(range(T)):
+            delta = rewards[t] + gamma * values[t + 1] * (1 - dones[t]) - values[t]
             gae = delta + gamma * gae_lambda * (1 - dones[t]) * gae
-            self.advantages[t] = gae
+            advantages[t] = gae
 
-        # Compute TD target
+        # Flatten back to match the buffer layout
+        self.advantages[:self.pos] = advantages.view(-1)
         self.returns[:self.pos] = self.advantages[:self.pos] + self.values[:self.pos]
 
         # Normalize advantages

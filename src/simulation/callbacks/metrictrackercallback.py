@@ -1,12 +1,7 @@
-import os
 import logging
-from typing import Any, Dict, List
+from typing import List
 import numpy as np
-import pandas as pd
-from cloudpickle import cloudpickle
 from loguru import logger
-from src.metrics.metricstrackerregistry import MetricsTrackerRegistry
-from src.agents.agent import Agent
 from src.metrics.metrictracker import MetricsTracker
 from src.simulation.callbacks.abstractcallback import AbstractCallback
 from src.simulation.simulatorldata import SimulatorRLData
@@ -62,6 +57,7 @@ class MetricTrackerCallback(AbstractCallback):
         return True
     
     def on_learn(self, learning_info) -> None:
+        super().on_learn(learning_info)
         if learning_info and self.metrics_tracker:
             for key, value in learning_info.items():
                 self.metrics_tracker.record_metric(key, self.agent_id, self.episodes_finished, value)
@@ -71,7 +67,6 @@ class MetricTrackerCallback(AbstractCallback):
         Callback at the end of an episode.
         """
         super().on_episode_end()
-        pass
 
     def on_training_end(self) -> None:
         """

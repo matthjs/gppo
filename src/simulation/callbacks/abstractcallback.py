@@ -15,23 +15,13 @@ class AbstractCallback(ABC):
         """
         Constructor for AbstractCallback.
         """
-        self.mode: Optional[str] = None
-        self.num_steps: int = 0
-        self.num_episodes: int = 0
-        self.logging: bool = False
-        self.extra: Optional[Any] = None
-        self.agent: Optional[Agent] = None
-        self.agent_id: Optional[str] = None
-        self.agent_config: Optional[Any] = None
-        self.metrics_tracker_registry: Optional[Any] = None
-        self.df: Optional[pd.DataFrame] = None
-        self.experiment_id: Optional[str] = None
-        self.old_obs: Optional[Any] = None
+        self.num_steps = 0
+        self.old_obs = None
 
     def init_callback(self, data: SimulatorRLData) -> None:
         pass
 
-    def on_step(self, action: Any, reward: float, next_obs: Any, done: bool) -> bool:
+    def on_step(self, action, reward, next_obs, done) -> bool:
         """
         Callback for each step of the environment.
 
