@@ -1,4 +1,5 @@
 import logging
+import pathlib
 import wandb
 from src.simulation.callbacks.abstractcallback import AbstractCallback
 from src.simulation.simulatorldata import SimulatorRLData
@@ -24,6 +25,7 @@ class WandbCallback(AbstractCallback):
         config: dict = None,
         run_name: str = None,
         verbose: int = logging.INFO,
+        plot_dir: str = None
     ):
         super().__init__()
         self.metric_callback = metric_callback
@@ -31,6 +33,7 @@ class WandbCallback(AbstractCallback):
         self.run_name = run_name
         self.entity = entity
         self.config = config or {}
+        self.plot_dir = pathlib.Path(plot_dir) if plot_dir else None
         self.run = None
 
         logger.setLevel(verbose)
@@ -68,6 +71,18 @@ class WandbCallback(AbstractCallback):
         #         wandb.log({f"env_{i}_running_return": self.metric_callback.episode_returns[i]})
 
         return continue_training
+    
+    def _log_plots(self):
+        """
+        Log all .png/.svg/.pdf files from the plot directory to wandb.
+        """
+        if not self.plot_dir or not self.plot_dir.exists():
+            return
+
+        for ext in ("*.png", "*.svg", "*.pdf"):
+            for file in self.plot_dir.glob(ext):
+                wandb.log({f"plots/{file.name}": wandb.Image(str(file))})
+                logger.debug(f"Logged plot {file}")
 
     def on_episode_end(self):
         super().on_episode_end()
@@ -83,6 +98,9 @@ class WandbCallback(AbstractCallback):
             logger.debug(
                 f"WandbCallback logged episode {self.metric_callback.episodes_finished}, return={last_return:.2f}"
             )
+        
+        # Log plots at the end of each episode
+        self._log_plots()
 
     def on_learn(self, learning_info):
         """
@@ -97,5 +115,9 @@ class WandbCallback(AbstractCallback):
     def on_training_end(self):
         super().on_training_end()
         self.metric_callback.on_training_end()
+
+        # Final log of plots
+        self._log_plots()
+
         wandb.finish()
         logger.info("WandbCallback training ended and run closed.")

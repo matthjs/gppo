@@ -20,6 +20,9 @@ class WandbLogger:
     ) -> None:
         """
         Initialize a WandbLogger.
+        NOTE: The metric_tracker composition functionality is legacy (and can be removed later)
+        but I am keeping the logger itself for compatibility with the BayesianOptimizer class.
+        For actual training/not hyperparameter tuning, use the WandbCallback instead.
 
         :param enable: If False, disables all logging.
         :param project: Name of the W&B project.
