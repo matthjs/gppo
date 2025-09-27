@@ -41,7 +41,7 @@ class SB3CallbackAdapter(BaseCallback):
         Can map to episode end if needed.
         """
         # Collect learning info from SB3
-        learning_info = self.locals.get("infos", [{}])[0]  # SB3 puts info dict in 'infos'
+        learning_info = {} # TODO: For now just make this empty # self.locals.get("infos", [{}])[0]  # SB3 puts info dict in 'infos'
         if isinstance(learning_info, dict) and learning_info:
             self.callback.on_learn(learning_info)
 

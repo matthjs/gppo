@@ -66,7 +66,7 @@ class SimulatorRL:
             self._env_interaction(self.num_episodes, training=True)
 
     def _train_sb3(self, num_episodes: int = 10):
-        logger.info("Delegating training to SB3 agent.learn")
+        logger.info("[{self.experiment_id}] Delegating training to SB3 agent.learn")
         max_episode_callback = StopTrainingOnMaxEpisodes(max_episodes=num_episodes, verbose=0)
         sb_callbacks = [max_episode_callback]
         for callback in self.callbacks:

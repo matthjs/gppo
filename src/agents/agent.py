@@ -45,13 +45,11 @@ class Agent(ABC):
         """
         pass
 
-    @abstractmethod
     def is_stable_baselines_wrapper(self) -> bool:
-        pass
+        return False
 
-    @abstractmethod
     def stable_baselines_unwrapped(self) -> BaseAlgorithm:
-        pass
+        return None
 
     def save(self, path: str) -> None:
         raise NotImplementedError("save method not implemented!")
