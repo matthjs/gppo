@@ -1,5 +1,8 @@
+from abc import abstractmethod
+from typing import Dict, Union
 import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
+from traitlets import Any
 from src.agents.agent import Agent
 
 
@@ -14,31 +17,31 @@ class StableBaselinesAdapter(Agent):
 
         :param model: Stable Baselines model to adapt.
         """
-        super().__init__({}, model.observation_space, model.action_space)
         self._sb_model = model
 
-    def add_trajectory(self, trajectory: tuple) -> None:
-        """
-        Add a trajectory to the agent (not used in this adapter).
+    def store_transition(
+            self,
+            state: np.ndarray,
+            action: Union[int, np.ndarray],
+            reward: float,
+            new_state: np.ndarray,
+            done: bool
+    ) -> None:
+        pass
 
-        :param trajectory: Tuple containing (state, action, reward, next_state).
+    def learn(self) -> Dict[str, Any]:
+        """!
+        Perform learning update.
+        This method should be implemented by the child class.
+        Can return a dictionary e.g. {'loss': 0.1}.
         """
         pass
 
-    def update(self) -> None:
-        """
-        Update method (not used in this adapter).
-        """
-        pass
-
-    def policy(self, state) -> int | np.ndarray:
-        """
-        Get the action from the Stable Baselines model.
-
-        :param state: The state.
-        :return: The action predicted by the model.
-        """
-        return self._sb_model.predict(state)[0]
+    def choose_action(
+            self,
+            observation: np.ndarray
+    ) -> Union[int, np.ndarray]:
+        return self._sb_model.predict(observation) # [0]
 
     def is_stable_baselines_wrapper(self) -> bool:
         """

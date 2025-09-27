@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 import numpy as np
 from typing import Any, Dict, Optional, Union
+from stable_baselines3.common.base_class import BaseAlgorithm
 
 
 class Agent(ABC):
@@ -42,6 +43,14 @@ class Agent(ABC):
         This method should be implemented by the child class.
         Can return a dictionary e.g. {'loss': 0.1}.
         """
+        pass
+
+    @abstractmethod
+    def is_stable_baselines_wrapper(self) -> bool:
+        pass
+
+    @abstractmethod
+    def stable_baselines_unwrapped(self) -> BaseAlgorithm:
         pass
 
     def save(self, path: str) -> None:

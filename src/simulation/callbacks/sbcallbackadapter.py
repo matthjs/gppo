@@ -17,11 +17,9 @@ class SB3CallbackAdapter(BaseCallback):
         Verbosity level (0 = silent, 1 = info, 2 = debug).
     """
 
-    def __init__(self, callback: AbstractCallback, data: SimulatorRLData, verbose: int = 0):
+    def __init__(self, callback: AbstractCallback, verbose: int = 0):
         super().__init__(verbose=verbose)
         self.callback = callback
-        self.data = data
-        self.callback.init_callback(data)
 
     def _on_training_start(self) -> None:
         self.callback.on_training_start()

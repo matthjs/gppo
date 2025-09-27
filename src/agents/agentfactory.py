@@ -1,10 +1,12 @@
 from typing import Union, Optional
 import gymnasium as gym
+from stable_baselines3 import PPO
 import torch
 from src.agents.agent import Agent
 from src.agents.gppoagent import GPPOAgent
 from src.agents.randomagent import RandomAgent
 from src.agents.ppoagent import PPOAgent
+from src.agents.sbadapter import StableBaselinesAdapter
 
 
 class AgentFactory:
@@ -81,17 +83,24 @@ class AgentFactory:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         agent_params.update({
-            "state_dimensions": obs_space.shape,
-            "action_dimensions": action_space.shape,
-            "device": device,
-            "n_envs": n_envs
+            "device": device
         })
 
         agent = None
 
-        if agent_type == "PPO":
+        if agent_type == "PPO":   # DEPRECATED: Because the other implementation assume parallel envs
+            agent_params.update({
+                "state_dimensions": obs_space.shape,
+                "action_dimensions": action_space.shape,
+                "n_envs": n_envs
+            })
             agent = PPOAgent(**agent_params)
         elif agent_type == "GPPO":
+            agent_params.update({
+                "state_dimensions": obs_space.shape,
+                "action_dimensions": action_space.shape,
+                "n_envs": n_envs
+            })
             # Check if architecture_choice is present
             arch_choice = agent_params.pop("architecture_choice", None)
             if arch_choice is not None:
@@ -101,6 +110,12 @@ class AgentFactory:
                 # Update agent_params with architecture config
                 agent_params.update(arch_config)
             agent = GPPOAgent(**agent_params)
+        elif agent_type == "SB_PPO":
+            agent_params.update({
+                "policy": "MlpPolicy",   # NOTE: This is hardcoded for now.
+                "env": env,
+            })
+            agent = StableBaselinesAdapter(PPO(**agent_params))
         elif agent_type == "RANDOM":
             agent = RandomAgent(action_space)
         else:

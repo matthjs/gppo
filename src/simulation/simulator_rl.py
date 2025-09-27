@@ -5,6 +5,7 @@ import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.callbacks import StopTrainingOnMaxEpisodes
 from src.agents.agent import Agent
+from src.agents.sbadapter import StableBaselinesAdapter
 from src.simulation.callbacks.abstractcallback import AbstractCallback
 from src.simulation.callbacks.sbcallbackadapter import SB3CallbackAdapter
 from src.simulation.envmanager import EnvManager
@@ -59,7 +60,7 @@ class SimulatorRL:
     def train(self) -> None:
         self._call_callbacks("init_callback",
                              data=SimulatorRLData(self))
-        if isinstance(self.agent, BaseAlgorithm):
+        if isinstance(self.agent, StableBaselinesAdapter):
             self._train_sb3(self.num_episodes)
         else:
             self._env_interaction(self.num_episodes, training=True)
@@ -69,7 +70,7 @@ class SimulatorRL:
         max_episode_callback = StopTrainingOnMaxEpisodes(max_episodes=num_episodes, verbose=0)
         sb_callbacks = [max_episode_callback]
         for callback in self.callbacks:
-            callback.append(SB3CallbackAdapter(callback))
+            sb_callbacks.append(SB3CallbackAdapter(callback))
         model = self.agent.stable_baselines_unwrapped()
 
         model.learn(total_timesteps=4242424242424, callback=sb_callbacks)

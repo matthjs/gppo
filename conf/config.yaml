@@ -1,15 +1,15 @@
 defaults:
   - mode: train # Set a default mode value, it can be overridden by command-line args
-  - agent: gppo_walker2d
+  - agent: sb_ppo
   - _self_
 
-exp_id: "test_experiment"
+exp_id: "test_experiment2"
 
 # Common hyperparameters (can be overridden)
 num_episodes: 100
 num_bootstrap_samples: 100
-num_runs: 2
-n_envs: 8
+num_runs: 1
+n_envs: 1
 results_save_path: "./results/"
 environment: "Walker2d-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
