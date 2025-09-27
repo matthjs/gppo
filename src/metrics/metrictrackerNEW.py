@@ -441,7 +441,7 @@ if __name__ == "__main__":
 
     # ------------------- Step 2: Add initial runs (run_001 and run_002) -------------------
     rng = np.random.RandomState(0)
-    initial_runs = ["run_001", "run_002"]
+    initial_runs = [0, 1]
     for run in initial_runs:
         for ep in range(1, 201):
             mt.record_metric("return", "PPO", ep, 20 + 0.1 * ep + rng.randn() * 2.0 + (0.5 if run == "run_002" else 0.0), run_id=run)
@@ -467,7 +467,7 @@ if __name__ == "__main__":
 
     # ------------------- Step 5: Add new runs (run_003 and run_004) -------------------
     rng_new = np.random.RandomState(42)
-    new_runs = ["run_003", "run_004"]
+    new_runs = [3, 4]
     for run in new_runs:
         for ep in range(1, 201):
             mt_reload.record_metric("return", "PPO", ep, 20 + 0.1 * ep + rng_new.randn() * 2.0, run_id=run)

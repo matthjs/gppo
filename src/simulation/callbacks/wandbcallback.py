@@ -74,15 +74,18 @@ class WandbCallback(AbstractCallback):
     
     def _log_plots(self):
         """
-        Log all .png/.svg/.pdf files from the plot directory to wandb.
+        Log all .png/.svg files from the plot directory to wandb and save them as artifacts.
         """
         if not self.plot_dir or not self.plot_dir.exists():
             return
 
-        for ext in ("*.png", "*.svg", "*.pdf"):
+        artifact = wandb.Artifact(f"{self.run_name}_plots", type="plots")
+        for ext in ("*.png", "*.svg"):
             for file in self.plot_dir.glob(ext):
                 wandb.log({f"plots/{file.name}": wandb.Image(str(file))})
+                artifact.add_file(str(file))
                 logger.debug(f"Logged plot {file}")
+        self.run.log_artifact(artifact)
 
     def on_episode_end(self):
         super().on_episode_end()
@@ -117,7 +120,16 @@ class WandbCallback(AbstractCallback):
         self.metric_callback.on_training_end()
 
         # Final log of plots
-        self._log_plots()
+        # self._log_plots()
+        # Add all CSVs in the experiment folder
+        artifact = wandb.Artifact(f"{self.run_name}_metrics", type="metrics")
+        save_root = self.metric_callback.save_path
+        experiment_id = getattr(self.metric_callback, "experiment_id", "default_experiment")
+        env_id = getattr(self.metric_callback, "env_id", "default_env")
+        experiment_path = pathlib.Path(save_root) / experiment_id / env_id
+        for csv_file in experiment_path.rglob("*.csv"):
+            artifact.add_file(str(csv_file))
+        self.run.log_artifact(artifact)
 
         wandb.finish()
         logger.info("WandbCallback training ended and run closed.")

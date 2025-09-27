@@ -1,0 +1,137 @@
+    def plot_metric_for_each_agent(self,
+                                   metric_name: str,
+                                   file_name: str,
+                                   num_episodes: int = None,
+                                   x_axis_label: str = "Episodes",
+                                   y_axis_label: str = "Metric Value",
+                                   title: str = None,
+                                   smoothing_window: int = 1,
+                                   ribbon: bool = True,
+                                   err_bars: bool = False,
+                                   baseline_agent_id: str = "RandomAgent",
+                                   ncols: int = 3) -> None:
+        """
+        Plot each agent vs. baseline in its own subplot, all in one figure,
+        with properly padded global X/Y labels.
+        """
+        with self._lock:
+            if metric_name not in self._metrics_history:
+                raise ValueError(f"Metric '{metric_name}' not found")
+
+            # Extract histories
+            all_agents = dict(self._metrics_history[metric_name])
+            if baseline_agent_id not in all_agents:
+                raise ValueError(f"Baseline '{baseline_agent_id}' not found")
+            baseline_hist = all_agents.pop(baseline_agent_id)
+
+            # Prepare baseline data
+            sorted_base = (sorted(baseline_hist.items())[:num_episodes]
+                           if num_episodes else sorted(baseline_hist.items()))
+            base_eps = [ep for ep, _ in sorted_base]
+            base_iqm, base_low, base_high = zip(*(
+                self.get_iqm_ci(metric_name, baseline_agent_id, ep)
+                for ep, _ in sorted_base
+            ))
+            if smoothing_window > 1:
+                base_iqm = pd.Series(base_iqm).rolling(window=smoothing_window, min_periods=1).mean().tolist()
+                base_low = pd.Series(base_low).rolling(window=smoothing_window, min_periods=1).mean().tolist()
+                base_high = pd.Series(base_high).rolling(window=smoothing_window, min_periods=1).mean().tolist()
+
+            # Layout calculation
+            agent_ids = list(all_agents.keys())
+            n_agents = len(agent_ids)
+            nrows = int(np.ceil(n_agents / ncols))
+
+            sns.set(style="darkgrid")
+            fig, axes = plt.subplots(
+                nrows=nrows, ncols=ncols,
+                figsize=(5 * ncols, 4 * nrows),
+                sharex=True, sharey=True
+            )
+            axes = axes.flatten()
+
+            # Per-agent subplot
+            for idx, agent_id in enumerate(agent_ids):
+                ax = axes[idx]
+                hist = all_agents[agent_id]
+                sorted_agent = (sorted(hist.items())[:num_episodes]
+                                if num_episodes else sorted(hist.items()))
+                eps = [ep for ep, _ in sorted_agent]
+                iqm_vals, low_vals, high_vals = zip(*(
+                    self.get_iqm_ci(metric_name, agent_id, ep)
+                    for ep, _ in sorted_agent
+                ))
+
+                if smoothing_window > 1:
+                    iqm_s = pd.Series(iqm_vals).rolling(window=smoothing_window, min_periods=1).mean().tolist()
+                    low_s = pd.Series(low_vals).rolling(window=smoothing_window, min_periods=1).mean().tolist()
+                    high_s = pd.Series(high_vals).rolling(window=smoothing_window, min_periods=1).mean().tolist()
+                else:
+                    iqm_s, low_s, high_s = iqm_vals, low_vals, high_vals
+
+                # Baseline
+                if ribbon:
+                    ax.fill_between(base_eps, base_low, base_high, color="gray", alpha=0.2)
+                ax.plot(base_eps, base_iqm, color="gray", lw=2, label=baseline_agent_id)
+
+                # Agent
+                if ribbon:
+                    ax.fill_between(eps, low_s, high_s, alpha=0.2)
+                line, = ax.plot(eps, iqm_s, lw=2.5, label="Agent")
+                color = line.get_color()
+
+                if err_bars:
+                    marks = min(5, len(eps))
+                    for i in np.linspace(0, len(eps) - 1, marks, dtype=int):
+                        err_low = iqm_vals[i] - low_vals[i]
+                        err_high = high_vals[i] - iqm_vals[i]
+                        # outline
+                        ax.errorbar(eps[i], iqm_vals[i],
+                                    yerr=[[err_low], [err_high]],
+                                    fmt='none', color='black',
+                                    linewidth=4, capsize=5, capthick=2, zorder=2)
+                        # colored
+                        ax.errorbar(eps[i], iqm_vals[i],
+                                    yerr=[[err_low], [err_high]],
+                                    fmt='none', color=color,
+                                    linewidth=2, capsize=4, capthick=1, zorder=3)
+
+                ax.axhline(1, color='black', linestyle='--', alpha=0.6, lw=1)
+                display_label = agent_id.replace("Agent", "") if agent_id.endswith("Agent") else agent_id
+                ax.set_title(display_label, fontsize=14)
+                ax.grid(True, linestyle='--', alpha=0.4)
+
+            # Remove unused axes
+            for j in range(n_agents, len(axes)):
+                fig.delaxes(axes[j])
+
+            # Super-title and global labels with padding
+            fig.suptitle(
+                title or f"{metric_name.capitalize()} per Agent vs. {baseline_agent_id}",
+                fontsize=18, y=0.98
+            )
+            fig.supxlabel(x_axis_label, fontsize=16, y=0.02)
+
+            # Adjusted ylabel positionings
+            left_margin = 0.10  # Increased from 0.10 to create more space
+
+            fig.supylabel(y_axis_label, fontsize=16, x=left_margin - 0.04, ha='right')
+
+            # Single legend
+            handles, labels = axes[0].get_legend_handles_labels()
+            fig.legend(handles, labels, loc='lower right', fontsize=12)
+
+            # Adjust margins to avoid overlap
+            fig.subplots_adjust(
+                left=left_margin,  # More space for y-label
+                bottom=0.10,  # Space for x-label
+                top=0.92,  # Space for suptitle
+                right=0.97,
+                wspace=0.3,
+                hspace=0.3
+            )
+
+            # Save & close (without tight_layout to preserve our adjustments)
+            plt.savefig(os.path.join(self.save_path, file_name))
+            plt.savefig(os.path.join(self.save_path, file_name) + ".svg")
+            plt.close(fig)

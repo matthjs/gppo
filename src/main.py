@@ -6,7 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import eval_rl_agent, train_rl_agent, create_rl_agent
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer
-from src.metrics.metrictracker import MetricsTracker
+from src.metrics.metrictrackerNEW import MetricsTracker
 from src.simulation.callbacks.metrictrackercallback import MetricTrackerCallback
 from src.simulation.callbacks.wandbcallback import WandbCallback
 from src.simulation.envmanager import EnvManager
@@ -25,13 +25,16 @@ def main(cfg: DictConfig):
         os.makedirs(cfg.results_save_path, exist_ok=True)
 
     if cfg.mode.name == 'train':
-        metrics_path = os.path.join(cfg.results_save_path, "metrics.json")
+        # metrics_path = os.path.join(cfg.results_save_path, "metrics.json")
+        exp_id = cfg.exp_id
+        metrics_path = os.path.join(cfg.results_save_path, exp_id)
         tracker = MetricsTracker(n_bootstrap=cfg.num_bootstrap_samples)
         if cfg.mode.import_metrics:
-            tracker.import_metrics(metrics_path)
+            # tracker.import_metrics(metrics_path)
+            tracker.load_results_from_dir(metrics_path, cfg.agent.agent_type, cfg.environment)
         tracker.set_save_path(cfg.results_save_path)
 
-        logger.add_metrics_tracker(tracker)
+        # logger.add_metrics_tracker(tracker)
 
         if cfg.mode.train:
             for run_idx in range(cfg.num_runs):
@@ -43,6 +46,7 @@ def main(cfg: DictConfig):
                     cfg.n_envs,
                     OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
                 env_manager = EnvManager(
+                    env_id=cfg.environment,
                     env_fn=lambda: gym.make(cfg.environment),
                     n_envs=cfg.n_envs,
                     use_subproc=True,
@@ -50,21 +54,21 @@ def main(cfg: DictConfig):
                 )
 
                 callbacks=[]
-                cb = MetricTrackerCallback(tracker)
+                cb = MetricTrackerCallback(metric_tracker=tracker, run_id=run_idx)
                 if cfg.wandb.use_wandb:
                     wandb_callback = WandbCallback(
                         metric_callback=cb,
                         project=cfg.wandb.project,
                         entity=cfg.wandb.entity,
                         config=dict(cfg),
-                        run_name=cfg.mode.name + f"{cfg.agent.agent_type}_run{run_idx+1}",
+                        run_name=cfg.exp_id + f"{cfg.agent.agent_type}_run{run_idx+1}",
                         plot_dir=cfg.results_save_path  # Log plots from the results save path
                     )
                     callbacks.append(wandb_callback)
                 else:
                     callbacks.append(cb)
 
-                sim = SimulatorRL(env_manager, agent,
+                sim = SimulatorRL(exp_id, cfg.agent.agent_type, env_manager, agent,
                                   num_episodes=cfg.num_episodes,
                                   callbacks=callbacks)
                 sim.train()

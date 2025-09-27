@@ -3,10 +3,12 @@ defaults:
   - agent: gppo_walker2d
   - _self_
 
+exp_id: "test_experiment"
+
 # Common hyperparameters (can be overridden)
-num_episodes: 10000
+num_episodes: 100
 num_bootstrap_samples: 100
-num_runs: 1
+num_runs: 2
 n_envs: 8
 results_save_path: "./results/"
 environment: "Walker2d-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5

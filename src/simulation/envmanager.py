@@ -39,6 +39,7 @@ class EnvManager:
 
     def __init__(
         self,
+        env_id: str,
         training: bool = True,
         env_fns: Optional[Sequence[Callable[[], Any]]] = None,
         env_fn: Optional[Callable[[], Any]] = None,
@@ -51,6 +52,8 @@ class EnvManager:
         gamma: float = 0.99,
         norm_reward: bool = False,
     ) -> None:
+        self.env_id = env_id
+
         if env_fns is None and env_fn is None:
             raise ValueError("Provide env_fns (sequence) or env_fn (single callable)")
 

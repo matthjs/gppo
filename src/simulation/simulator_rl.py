@@ -26,6 +26,8 @@ class SimulatorRL:
 
     def __init__(
         self,
+        experiment_id: str,
+        agent_id: str,
         env_manager: EnvManager,
         agent: Agent,
         num_episodes: int,
@@ -34,6 +36,8 @@ class SimulatorRL:
         load_model: bool = False,
         device: Optional[str] = None,
     ):
+        self.experiment_id = experiment_id
+        self.agent_id = agent_id
         self.env_manager = env_manager
         self.n_env = self.env_manager.n_envs
         self.agent = agent
@@ -41,6 +45,7 @@ class SimulatorRL:
         self.save_model = save_model
         self.load_model = load_model
         self.num_episodes = num_episodes
+        self.env_id = env_manager.env_id
         self.device = device
 
     def _call_callbacks(self, fn_name: str, *args, **kwargs):
@@ -70,7 +75,7 @@ class SimulatorRL:
         model.learn(total_timesteps=4242424242424, callback=sb_callbacks)
 
     def _env_interaction(self, num_episodes: int, training: bool = True) -> None:
-        logger.info(f"Running custom training loop: total_episodes={num_episodes}")
+        logger.info(f"[{self.experiment_id}] Running custom training loop: total_episodes={num_episodes}")
         self._call_callbacks("on_training_start")
         n_env = self.env_manager.n_envs
 
@@ -106,9 +111,9 @@ class SimulatorRL:
                 obs = next_obs
 
         except StopIteration:
-            print("Early stopping triggered!")
+            logger.info(f"[{self.experiment_id}] Early stopping triggered!")
         except KeyboardInterrupt:
-            print("Training interrupted by user!")
+            logger.info(f"[{self.experiment_id}] Training interrupted by user!")
         # except Exception as e:
         #    print(f"General error: {e}")
 

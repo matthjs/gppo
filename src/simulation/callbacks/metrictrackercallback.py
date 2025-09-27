@@ -1,8 +1,10 @@
 import logging
+import os
 from typing import List
+from git import Union
 import numpy as np
 from loguru import logger
-from src.metrics.metrictracker import MetricsTracker
+from src.metrics.metrictrackerNEW import MetricsTracker
 from src.simulation.callbacks.abstractcallback import AbstractCallback
 from src.simulation.simulatorldata import SimulatorRLData
 
@@ -11,25 +13,35 @@ logger.setLevel(logging.INFO)
 
 
 class MetricTrackerCallback(AbstractCallback):
-    def __init__(self, metric_tracker: MetricsTracker = None) -> None:
+    def __init__(self, run_id: Union[str, int], metric_tracker: MetricsTracker = None) -> None:
         super().__init__()
+        if isinstance(run_id, int):
+            run_id = str(run_id)
+        self.run_id = run_id
         self.n_env = None
         self.episode_returns = None
         self.completed_returns = None
         self.episodes_finished = None
         self.num_episodes = None
         self.metrics_tracker = metric_tracker
+        self.experiment_id = None
+        self.agent_id = None
+
+        # this is a bit sketchy
+        self.save_path = self.metrics_tracker.save_path if self.metrics_tracker else "./"
 
     def init_callback(self, data: SimulatorRLData) -> None:
         super().init_callback(data)
         # self.episode_reward = 0
         self.n_env = data.n_env
-        self.agent_id = type(data.agent).__name__
+        self.agent_id = data.agent_id
         self.num_episodes = data.num_episodes
         # Track ongoing returns for each environment
         self.episode_returns = np.zeros(self.n_env, dtype=np.float32)
         self.completed_returns: List[float] = []
         self.episodes_finished = 0
+        self.experiment_id = data.experiment_id
+        self.env_id = data.env_id
 
 
     def on_step(self, action, reward, next_obs, done) -> bool:
@@ -53,14 +65,14 @@ class MetricTrackerCallback(AbstractCallback):
                 logger.info(f"Episode {self.episodes_finished} finished with return {self.episode_returns[i]:.2f}")
                 self.episode_returns[i] = 0.0  # reset for next episode
                 self.metrics_tracker.record_metric("return", agent_id=self.agent_id,
-                                         episode_idx=self.episodes_finished, value=episode_return)
+                                         episode_idx=self.episodes_finished, value=episode_return, run_id=self.run_id)
         return True
     
     def on_learn(self, learning_info) -> None:
         super().on_learn(learning_info)
         if learning_info and self.metrics_tracker:
             for key, value in learning_info.items():
-                self.metrics_tracker.record_metric(key, self.agent_id, self.episodes_finished, value)
+                self.metrics_tracker.record_metric(key, self.agent_id, self.episodes_finished, value, run_id=self.run_id)
 
     def on_episode_end(self) -> None:
         """
@@ -74,4 +86,6 @@ class MetricTrackerCallback(AbstractCallback):
         """
         super().on_training_end()
         if self.metrics_tracker:
-            self.metrics_tracker.plot_all_metrics(num_episodes=self.num_episodes)
+            # self.metrics_tracker.plot_all_metrics(num_episodes=self.num_episodes)
+            self.metrics_tracker.save_all_runs(os.path.join(self.save_path, self.experiment_id), self.agent_id, self.env_id)
+            self.metrics_tracker.save_env_aggregated_plots(os.path.join(self.save_path, self.experiment_id), self.env_id)
