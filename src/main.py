@@ -61,7 +61,7 @@ def main(cfg: DictConfig):
                         project=cfg.wandb.project,
                         entity=cfg.wandb.entity,
                         config=dict(cfg),
-                        run_name=cfg.exp_id + f"{cfg.agent.agent_type}_run{run_idx+1}",
+                        run_name=cfg.exp_id + f"{cfg.agent.agent_type}_run{run_idx}",
                         plot_dir=cfg.results_save_path  # Log plots from the results save path
                     )
                     callbacks.append(wandb_callback)

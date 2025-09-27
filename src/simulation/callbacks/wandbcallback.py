@@ -121,14 +121,19 @@ class WandbCallback(AbstractCallback):
 
         # Final log of plots
         # self._log_plots()
+
         # Add all CSVs in the experiment folder
         artifact = wandb.Artifact(f"{self.run_name}_metrics", type="metrics")
         save_root = self.metric_callback.save_path
         experiment_id = getattr(self.metric_callback, "experiment_id", "default_experiment")
         env_id = getattr(self.metric_callback, "env_id", "default_env")
         experiment_path = pathlib.Path(save_root) / experiment_id / env_id
+
         for csv_file in experiment_path.rglob("*.csv"):
-            artifact.add_file(str(csv_file))
+            # Preserve folder structure inside the artifact
+            rel_path = csv_file.relative_to(experiment_path)
+            artifact.add_file(str(csv_file), name=str(rel_path))
+
         self.run.log_artifact(artifact)
 
         wandb.finish()

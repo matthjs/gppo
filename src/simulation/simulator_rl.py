@@ -81,9 +81,11 @@ class SimulatorRL:
         n_env = self.env_manager.n_envs
 
         episodes_finished = 0
+        total_return = 0.0
 
         try:
             obs = self.env_manager.reset()
+            ep_return = np.zeros(n_env)
 
             while episodes_finished < num_episodes:
                 actions = self.agent.choose_action(obs)
@@ -92,6 +94,7 @@ class SimulatorRL:
                 # Handle finished episodes
                 for i in range(n_env):
                     if dones[i]:
+                        total_return += ep_return[i]
                         episodes_finished += 1
 
                 # If return false stop training

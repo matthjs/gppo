@@ -41,7 +41,7 @@ class StableBaselinesAdapter(Agent):
             self,
             observation: np.ndarray
     ) -> Union[int, np.ndarray]:
-        return self._sb_model.predict(observation) # [0]
+        return self._sb_model.predict(observation)[0] # [0]
 
     def is_stable_baselines_wrapper(self) -> bool:
         """

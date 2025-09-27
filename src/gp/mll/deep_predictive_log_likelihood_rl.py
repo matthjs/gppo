@@ -59,7 +59,7 @@ class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
         ratio = torch.exp(deep_log_prob - old_log_probs)    # Note: Subtraction is division in log space.
         surr1 = ratio * advantages
         surr2 = torch.clamp(ratio, 1.0 - self.clip_range, 1.0 + self.clip_range) * advantages
-        policy_loss = torch.min(surr1, surr2).squeeze(-1).sum(-1)   # THE SUM IF IMPORTANT HERE.
+        policy_loss = torch.min(surr1, surr2).squeeze(-1).sum(-1)   # THE SUM IS IMPORTANT HERE.
 
         self.last_log_prob = deep_log_prob
         return policy_loss
