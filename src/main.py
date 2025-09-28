@@ -7,7 +7,9 @@ from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import eval_rl_agent, train_rl_agent, create_rl_agent
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer
 from src.metrics.metrictrackerNEW import MetricsTracker
+from src.simulation.callbacks.agentcheckpointcallback import AgentCheckpointCallback
 from src.simulation.callbacks.metrictrackercallback import MetricTrackerCallback
+from src.simulation.callbacks.vecnormalizecallback import VecNormalizeCallback
 from src.simulation.callbacks.wandbcallback import WandbCallback
 from src.simulation.envmanager import EnvManager
 from src.simulation.simulator_rl import SimulatorRL
@@ -64,9 +66,12 @@ def main(cfg: DictConfig):
                     norm_obs=cfg.normalize_obs
                 )
 
+                # ---- Callbacks ----
                 callbacks=[]
+                # Use MetricTracker?
                 cb = MetricTrackerCallback(metric_tracker=tracker, run_id=run_idx)
                 if cfg.wandb.use_wandb:
+                    # Also put metrics in Wandb?
                     wandb_callback = WandbCallback(
                         metric_callback=cb,
                         project=cfg.wandb.project,
@@ -78,8 +83,27 @@ def main(cfg: DictConfig):
                     callbacks.append(wandb_callback)
                 else:
                     callbacks.append(cb)
+                # Put early stopping condition?
                 if early_stop_cb:
                     callbacks.append(early_stop_cb)
+                # Save and/or load model/RL agent?
+                if cfg.mode.save_model or cfg.mode.load_model:
+                    callbacks.append(
+                        AgentCheckpointCallback(
+                            save_base=cfg.results_save_path,
+                            run_id=run_idx,   # Result will be saved per run
+                            load_on_start=cfg.mode.load_model,
+                            save_on_end=cfg.mode.save_model,
+                    ))
+                # Save and/or load VecNormalize stats?
+                if cfg.normalize_obs:
+                    callbacks.append(
+                        VecNormalizeCallback(
+                            save_base=cfg.results_save_path,
+                            run_id=run_idx,
+                            load_on_start=False,    # For now just always set it to false
+                            save_on_end=True   # For now, always do this
+                    ))
 
                 sim = SimulatorRL(exp_id, cfg.agent.agent_type, env_manager, agent,
                                   num_episodes=cfg.num_episodes,
@@ -88,6 +112,7 @@ def main(cfg: DictConfig):
         else:
             print("No training, running metric tracker plotting method...")
             tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
+            # Maybe also run sim.evaluate(...)?
     elif cfg.mode.name == 'hpo' or cfg.mode.name == 'hpo_gppo':
         # For now, use the legacy WandbLogger class.
         logger = WandbLogger(

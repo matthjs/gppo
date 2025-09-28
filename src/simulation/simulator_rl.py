@@ -123,12 +123,11 @@ class SimulatorRL:
                 obs = next_obs
 
         except StopIteration:
-            print("Early stopping triggered!")
+            logger.info("[{self.experiment_id}] Early stopping triggered!")
         except KeyboardInterrupt:
-            print("Training interrupted by user!")
-
-        if self.save_model:
-            print("Saving agent ... TODO")
+            logger.info("[{self.experiment_id}] Training interrupted by user!")
+        except SystemExit:
+            logger.info("[{self.experiment_id}] SystemExit received, stopping training!")
 
         self._call_callbacks("on_training_end")
         self.env_manager.close()
