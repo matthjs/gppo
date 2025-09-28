@@ -47,8 +47,6 @@ def main(cfg: DictConfig):
                     print(f"No existing metrics found for agent {agent_name} in {metrics_path}. Skipping.")
         tracker.set_save_path(cfg.results_save_path)
 
-        # logger.add_metrics_tracker(tracker)
-
         if cfg.mode.train:
             for run_idx in range(cfg.num_runs):
                 # Log each run
@@ -87,6 +85,9 @@ def main(cfg: DictConfig):
                                   num_episodes=cfg.num_episodes,
                                   callbacks=callbacks)
                 sim.train()
+        else:
+            print("No training, running metric tracker plotting method...")
+            tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
     elif cfg.mode.name == 'hpo' or cfg.mode.name == 'hpo_gppo':
         # For now, use the legacy WandbLogger class.
         logger = WandbLogger(
@@ -98,24 +99,20 @@ def main(cfg: DictConfig):
         )
 
         logger.start()
-        env = gym.make(cfg.environment)
+        info_env = gym.make(cfg.environment)
         bo = BayesianOptimizer(
             search_space=OmegaConf.to_container(cfg.mode.hpo.search_space, resolve=True),
-            model_factory=partial(create_rl_agent, env=env),
-            train_fn=partial(train_rl_agent, env=env, agent_id=cfg.agent.agent_type,
-                             callbacks=[early_stop_cb] if early_stop_cb else None,
-                             # early_stop_check=cfg.early_stopping.early_stop_check if cfg.early_stopping.enable else None,
-                             # early_stop_window=cfg.early_stopping.early_stop_window if cfg.early_stopping.enable else None,
-                             # early_stop_threshold=cfg.early_stopping.early_stop_threshold if cfg.early_stopping.enable else None),
-            ),
-            eval_fn=partial(eval_rl_agent, env=env, agent_id=cfg.agent.agent_type),
+            model_factory=partial(create_rl_agent, env=info_env),
+            train_fn=partial(train_rl_agent, env_id=cfg.environment, agent_id=cfg.agent.agent_type,
+                             normalize_obs=cfg.normalize_obs,
+                             callbacks=[early_stop_cb] if early_stop_cb else None),   # We only are interested in the early_stop callback here.
+            eval_fn=partial(eval_rl_agent, env_id=cfg.environment, agent_id=cfg.agent.agent_type),
             objective_name=cfg.mode.hpo.objective_name,
             minimize=cfg.mode.hpo.minimize,
             wandb_logger=logger
         )
         best = bo.optimize(n_trials=cfg.mode.hpo.n_trials)
         print("Best hyperparameters found:", best)
-
         logger.finish()
 
 

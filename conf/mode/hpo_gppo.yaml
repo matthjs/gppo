@@ -22,7 +22,7 @@ hpo:
       value_type: int
     - name: num_episodes
       type: fixed
-      value: 10000
+      value: 10
       value_type: int
     - name: beta
       type: fixed
@@ -31,6 +31,10 @@ hpo:
     - name: num_eval_episodes
       type: fixed
       value: 50
+      value_type: int
+    - name: n_envs
+      type: fixed
+      value: 8
       value_type: int
     - name: learning_rate
       type: range

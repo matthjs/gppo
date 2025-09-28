@@ -14,7 +14,7 @@ from src.simulation.envmanager import EnvManager
 from src.simulation.callbacks.abstractcallback import AbstractCallback
 
 
-def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
+def train_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
                    agent_id: Optional[str] = None,
                    callbacks: Optional[list[AbstractCallback]] = None,
                    normalize_obs: bool = True) -> Dict[str, float]:
@@ -28,8 +28,10 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
     :param normalize_obs: Whether to normalize observations.
     :return: Dictionary with training metrics.
     """
-    env_manager = EnvManager(env, n_envs=1,   # Only one env. for evaluation
-                             normalize_obs=normalize_obs)
+    env_manager = EnvManager(env_id=env_id,
+                             env_fn=lambda: gym.make(env_id),
+                             n_envs=params.get("n_envs", 1),
+                             norm_obs=normalize_obs)
 
     simulator = SimulatorRL(
         experiment_id=params.get("experiment_id", "default_exp"),
@@ -38,8 +40,8 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
         agent=agent,
         num_episodes=params["num_episodes"],
         callbacks=callbacks,
-        save_model=params.get("save_model", False),
-        load_model=params.get("load_model", False),
+        save_model=False,
+        load_model=False,
         device=params.get("device", None),
     )
 
@@ -48,7 +50,7 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
     return {"train/avg_return": avg_return} if avg_return is not None else {}
 
 
-def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
+def eval_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
                   agent_id: Optional[str] = None,
                   callbacks: Optional[list[AbstractCallback]] = None,
                   normalize_obs: bool = True) -> Dict[str, float]:
@@ -62,8 +64,10 @@ def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
     :param normalize_obs: Whether to normalize observations.
     :return: Dictionary with evaluation metrics.
     """
-    env_manager = EnvManager(env, n_envs=params.get("n_envs", 1),
-                             normalize_obs=normalize_obs)
+    env_manager = EnvManager(env_id=env_id,
+                             env_fn=lambda: gym.make(env_id),
+                             n_envs=params.get("n_envs", 1),
+                             norm_obs=normalize_obs)
 
     simulator = SimulatorRL(
         experiment_id=params.get("experiment_id", "default_exp"),
@@ -72,11 +76,13 @@ def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
         agent=agent,
         num_episodes=-1,  # No training episodes
         callbacks=callbacks,
+        save_model=False,
+        load_model=False,
         device=params.get("device", None),
     )
 
     avg_return = simulator.evaluate(num_eval_episodes=params.get("num_eval_episodes", 10))
-    return {"eval/avg_return": avg_return}
+    return {"return": avg_return}
 
 
 def create_rl_agent(params: Dict[str, Any], env: Union[str, gym.Env]) -> Agent:
@@ -89,13 +95,15 @@ def create_rl_agent(params: Dict[str, Any], env: Union[str, gym.Env]) -> Agent:
     """
     param_copy = dict(params)
     agent_type = param_copy.pop("agent_type")
+    n_envs = param_copy.pop("n_envs")
 
     # Remove non-agent params
     for key in ["num_episodes", "num_eval_episodes", "wandb_logger",
                 "verbose", "save_model", "load_model",
-                "experiment_id", "agent_id", "device", "n_envs"]:
+                "experiment_id", "agent_id", "device"]:
         param_copy.pop(key, None)
 
     return AgentFactory.create_agent(agent_type=agent_type,
                                      env=env,
+                                     n_envs=n_envs,
                                      agent_params=param_copy)
