@@ -39,8 +39,12 @@ def main(cfg: DictConfig):
         metrics_path = os.path.join(cfg.results_save_path, exp_id)
         tracker = MetricsTracker(n_bootstrap=cfg.num_bootstrap_samples)
         if cfg.mode.import_metrics:
-            # tracker.import_metrics(metrics_path)
-            tracker.load_results_from_dir(metrics_path, cfg.agent.agent_type, cfg.environment)
+            for agent_name in cfg.mode.agents:
+                # Dynamically import from src.agents
+                try:
+                    tracker.load_results_from_dir(metrics_path, agent_name, cfg.environment)
+                except FileNotFoundError:
+                    print(f"No existing metrics found for agent {agent_name} in {metrics_path}. Skipping.")
         tracker.set_save_path(cfg.results_save_path)
 
         # logger.add_metrics_tracker(tracker)
