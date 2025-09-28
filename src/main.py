@@ -134,7 +134,8 @@ def main(cfg: DictConfig):
             eval_fn=partial(eval_rl_agent, env_id=cfg.environment, agent_id=cfg.agent.agent_type),
             objective_name=cfg.mode.hpo.objective_name,
             minimize=cfg.mode.hpo.minimize,
-            wandb_logger=logger
+            wandb_logger=logger,
+            save_path=os.path.join(cfg.results_save_path, cfg.exp_id, cfg.agent.agent_type, cfg.environment)
         )
         best = bo.optimize(n_trials=cfg.mode.hpo.n_trials)
         print("Best hyperparameters found:", best)

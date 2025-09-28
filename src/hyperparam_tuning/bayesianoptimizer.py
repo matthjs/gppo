@@ -3,6 +3,7 @@ Taken from: https://github.com/matthjs/xai-gp/blob/main/xai_gp/hyperparam_tuning
 with slight adjustments to ensure compatibility with RL Agents.
 """
 import json
+import os
 from typing import Callable, Tuple, List, Union
 from ax import Experiment
 from ax.service.ax_client import AxClient
@@ -31,7 +32,8 @@ class BayesianOptimizer:
             tracking_metrics: Optional[Tuple[str]] = None,
             objective_name: str = "loss",
             minimize: bool = True,
-            wandb_logger: Optional[WandbLogger] = None
+            wandb_logger: Optional[WandbLogger] = None,
+            save_path: Optional[str] = None,
     ):
         """
         Generic Bayesian optimization wrapper for various models.
@@ -65,6 +67,7 @@ class BayesianOptimizer:
 
         self.objective_name = objective_name
         self.minimize = minimize
+        self.save_path = save_path
 
         # Initialize hyperparameter tuning experiment. We want to find the optimal set of
         # hyperparameters such that an objective is minimized (or maximized)
@@ -105,10 +108,13 @@ class BayesianOptimizer:
             )
 
         best = self.get_best_parameters()
-        if self.logger:
-            with open("./results/best_hyperparams.json", "w") as f:
+        if self.logger and self.save_path:
+            os.makedirs(self.save_path, exist_ok=True)
+            path = os.path.join(self.save_path, "best_hyperparams.json")
+            with open(path, "w") as f:
                 json.dump(best, f, indent=4)
-            self.logger.save("./results/best_hyperparams.json")
+            self.logger.save(path)
+            print(f"Saved best hyperparameters to {path}")
         return best
 
     def get_best_parameters(self) -> Dict[str, Any]:

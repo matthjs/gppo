@@ -3,7 +3,7 @@ defaults:
   - agent: sb_ppo
   - _self_
 
-exp_id: "test_experiment2"
+exp_id: "test_experiment_tmp"
 
 # Common hyperparameters (can be overridden)
 num_episodes: 1000
@@ -11,7 +11,7 @@ num_bootstrap_samples: 100
 num_runs: 1
 n_envs: 1
 results_save_path: "./results/"
-environment: "HumanoidStandup-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
+environment: "Walker2d-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 normalize_obs: True
 normalize_act: False   # Rescale to [-1,1]
