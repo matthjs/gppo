@@ -11,6 +11,13 @@ from typing import Dict, Any, Optional
 from ax.service.utils.instantiation import ObjectiveProperties
 from src.agents.agent import Agent
 from src.util.wandblogger import WandbLogger
+import warnings
+
+warnings.filterwarnings(
+    "once",
+    category=RuntimeWarning,
+    message=r"If using a 2-dim `batch_initial_conditions`.*"
+)
 
 
 class BayesianOptimizer:

@@ -1,9 +1,9 @@
 defaults:
   - mode: train # Set a default mode value, it can be overridden by command-line args
-  - agent: train
+  - agent: gppo_walker2d
   - _self_
 
-exp_id: "test_experiment2"
+exp_id: "test_experiment_test"
 
 # Common hyperparameters (can be overridden)
 num_episodes: 10000
