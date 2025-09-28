@@ -12,6 +12,7 @@ from src.simulation.callbacks.wandbcallback import WandbCallback
 from src.simulation.envmanager import EnvManager
 from src.simulation.simulator_rl import SimulatorRL
 from src.util.wandblogger import WandbLogger
+from src.simulation.callbacks.earlystopcallback import EarlyStopCallback
 
 
 @hydra.main(config_path="../conf", config_name="config.yaml", version_base=None)
@@ -23,6 +24,14 @@ def main(cfg: DictConfig):
 
     if cfg.results_save_path:
         os.makedirs(cfg.results_save_path, exist_ok=True)
+
+    early_stop_cb = None
+    if cfg.early_stopping.enable:
+        early_stop_cb = EarlyStopCallback(
+            early_stop_check=cfg.early_stopping.early_stop_check,
+            early_stop_window=cfg.early_stopping.early_stop_window,
+            early_stop_threshold=cfg.early_stopping.early_stop_threshold
+        )
 
     if cfg.mode.name == 'train':
         # metrics_path = os.path.join(cfg.results_save_path, "metrics.json")
@@ -67,6 +76,8 @@ def main(cfg: DictConfig):
                     callbacks.append(wandb_callback)
                 else:
                     callbacks.append(cb)
+                if early_stop_cb:
+                    callbacks.append(early_stop_cb)
 
                 sim = SimulatorRL(exp_id, cfg.agent.agent_type, env_manager, agent,
                                   num_episodes=cfg.num_episodes,
@@ -87,11 +98,13 @@ def main(cfg: DictConfig):
         bo = BayesianOptimizer(
             search_space=OmegaConf.to_container(cfg.mode.hpo.search_space, resolve=True),
             model_factory=partial(create_rl_agent, env=env),
-            train_fn=partial(train_rl_agent, env=env,
-                             early_stop_check=cfg.early_stopping.early_stop_check if cfg.early_stopping.enable else None,
-                             early_stop_window=cfg.early_stopping.early_stop_window if cfg.early_stopping.enable else None,
-                             early_stop_threshold=cfg.early_stopping.early_stop_threshold if cfg.early_stopping.enable else None),
-            eval_fn=partial(eval_rl_agent, env=env),
+            train_fn=partial(train_rl_agent, env=env, agent_id=cfg.agent.agent_type,
+                             callbacks=[early_stop_cb] if early_stop_cb else None,
+                             # early_stop_check=cfg.early_stopping.early_stop_check if cfg.early_stopping.enable else None,
+                             # early_stop_window=cfg.early_stopping.early_stop_window if cfg.early_stopping.enable else None,
+                             # early_stop_threshold=cfg.early_stopping.early_stop_threshold if cfg.early_stopping.enable else None),
+            ),
+            eval_fn=partial(eval_rl_agent, env=env, agent_id=cfg.agent.agent_type),
             objective_name=cfg.mode.hpo.objective_name,
             minimize=cfg.mode.hpo.minimize,
             wandb_logger=logger

@@ -1,88 +1,101 @@
-from typing import Union
+from typing import Optional, Union
 from src.agents.agentfactory import AgentFactory
-from src.util.interaction import create_agent_for_catch_env
+from src.simulation.simulator_rl import SimulatorRL
 from typing import Dict, Any
 from src.agents.agent import Agent
-from src.util.interaction import agent_env_loop
 import gymnasium as gym
 
 
+from typing import Any, Dict, Union
+import gymnasium as gym
+from src.agents.agent import Agent
+from src.agents.agentfactory import AgentFactory
+from src.simulation.envmanager import EnvManager
+from src.simulation.callbacks.abstractcallback import AbstractCallback
+
+
 def train_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
-                   normalize_obs: bool = True,
-                   early_stop_check: int = None,
-                   early_stop_window: int = None,
-                   early_stop_threshold: float = None) -> Dict[str, float]:
+                   agent_id: Optional[str] = None,
+                   callbacks: Optional[list[AbstractCallback]] = None,
+                   normalize_obs: bool = True) -> Dict[str, float]:
     """
-    Train the RL agent with the given hyperparameters.
+    Train the RL agent using the SimulatorRL wrapper.
 
     :param agent: RL Agent to train.
-    :param params: The hyperparameters to use during training.
-    :param env: The environment to train in (must follow Gym API).
+    :param params: Training hyperparameters.
+    :param env: The environment to train in (Gym API).
+    :param callbacks: Optional list of training callbacks.
+    :param normalize_obs: Whether to normalize observations.
     :return: Dictionary with training metrics.
     """
-    avg_return = agent_env_loop(
+    env_manager = EnvManager(env, n_envs=1,   # Only one env. for evaluation
+                             normalize_obs=normalize_obs)
+
+    simulator = SimulatorRL(
+        experiment_id=params.get("experiment_id", "default_exp"),
+        agent_id=agent_id if agent_id is not None else type(agent).__name__,
+        env_manager=env_manager,
         agent=agent,
-        num_episodes=params['num_episodes'],
-        wandb_logger=params.get("wandb_logger", None),
-        learning=True,
-        env=env,
-        verbose=params.get("verbose", False),
-        normalize_obs=normalize_obs,
-        early_stop_check=early_stop_check,
-        early_stop_window=early_stop_window,
-        early_stop_threshold=early_stop_threshold
+        num_episodes=params["num_episodes"],
+        callbacks=callbacks,
+        save_model=params.get("save_model", False),
+        load_model=params.get("load_model", False),
+        device=params.get("device", None),
     )
-    return {"train/avg_return": avg_return}
+
+    avg_return = simulator.train()
+
+    return {"train/avg_return": avg_return} if avg_return is not None else {}
 
 
 def eval_rl_agent(agent: Agent, params: Dict[str, Any], env: gym.Env,
+                  agent_id: Optional[str] = None,
+                  callbacks: Optional[list[AbstractCallback]] = None,
                   normalize_obs: bool = True) -> Dict[str, float]:
     """
     Evaluate the RL agent (no learning updates).
 
     :param agent: RL Agent to evaluate.
-    :param params: Hyperparameters (used for logging/evaluation).
-    :param env: The environment to evaluate in.
+    :param params: Evaluation hyperparameters.
+    :param env: The environment to evaluate in (Gym API).
+    :param callbacks: Optional list of callbacks.
+    :param normalize_obs: Whether to normalize observations.
     :return: Dictionary with evaluation metrics.
     """
-    avg_return = agent_env_loop(
+    env_manager = EnvManager(env, n_envs=params.get("n_envs", 1),
+                             normalize_obs=normalize_obs)
+
+    simulator = SimulatorRL(
+        experiment_id=params.get("experiment_id", "default_exp"),
+        agent_id=agent_id if agent_id is not None else type(agent).__name__,
+        env_manager=env_manager,
         agent=agent,
-        num_episodes=params['num_eval_episodes'],
-        wandb_logger=params.get("wandb_logger", None),
-        learning=False,
-        env=env,
-        verbose=params.get("verbose", False),
-        normalize_obs=normalize_obs
+        num_episodes=-1,  # No training episodes
+        callbacks=callbacks,
+        device=params.get("device", None),
     )
-    return {"return": avg_return}
+
+    avg_return = simulator.evaluate(num_eval_episodes=params.get("num_eval_episodes", 10))
+    return {"eval/avg_return": avg_return}
 
 
 def create_rl_agent(params: Dict[str, Any], env: Union[str, gym.Env]) -> Agent:
     """
     Create an RL agent using the AgentFactory with a specified environment.
 
+    :param params: Dictionary of agent parameters (must include 'agent_type').
     :param env: A Gym environment instance or string name.
-    :param params: Dictionary of agent parameters, must include 'agent_type'.
     :return: Instantiated Agent.
     """
     param_copy = dict(params)
-    agent_type = param_copy.pop('agent_type')
+    agent_type = param_copy.pop("agent_type")
 
-    # Clean up any non-agent hyperparameters to avoid constructor issues
-    param_copy.pop('num_episodes', None)
-    param_copy.pop('num_eval_episodes', None)
-    param_copy.pop('wandb_logger', None)
-    param_copy.pop('verbose', None)
+    # Remove non-agent params
+    for key in ["num_episodes", "num_eval_episodes", "wandb_logger",
+                "verbose", "save_model", "load_model",
+                "experiment_id", "agent_id", "device", "n_envs"]:
+        param_copy.pop(key, None)
 
-    return AgentFactory.create_agent(agent_type=agent_type, env=env, agent_params=params)
-
-
-def create_rl_agent_catch(params: Dict[str, Any]) -> Agent:
-    """
-    Create RL agent for the Catch environment.
-    """
-    param_copy = dict(params)
-    agent_type = param_copy.pop('agent_type')
-    num_episodes = param_copy.pop('num_episodes')
-    # the remaining parameters are the agent parameters.
-    return create_agent_for_catch_env(agent_type, num_episodes, agent_params=params)
+    return AgentFactory.create_agent(agent_type=agent_type,
+                                     env=env,
+                                     agent_params=param_copy)

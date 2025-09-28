@@ -57,13 +57,17 @@ class SimulatorRL:
                 return_value = return_value and ret
         return return_value
 
-    def train(self) -> None:
+    def train(self) -> Optional[float]:
         self._call_callbacks("init_callback",
                              data=SimulatorRLData(self))
         if isinstance(self.agent, StableBaselinesAdapter):
             self._train_sb3(self.num_episodes)
+            return None
         else:
-            self._env_interaction(self.num_episodes, training=True)
+            return self._env_interaction(self.num_episodes, training=True)
+
+    def evaluate(self, num_eval_episodes) -> float:
+        return self._env_interaction(num_eval_episodes, training=False)
 
     def _train_sb3(self, num_episodes: int = 10):
         logger.info("[{self.experiment_id}] Delegating training to SB3 agent.learn")
@@ -75,11 +79,13 @@ class SimulatorRL:
 
         model.learn(total_timesteps=4242424242424, callback=sb_callbacks)
 
-    def _env_interaction(self, num_episodes: int, training: bool = True) -> None:
-        logger.info(f"[{self.experiment_id}] Running custom training loop: total_episodes={num_episodes}")
+    def _env_interaction(self, num_episodes: int, training: bool = True) -> float:
+        """
+        This method assumes we are running on episodic environments.
+        """
+        logger.info(f"[{self.experiment_id}] Running custom {'training' if training else 'evaluation'} loop: total_episodes={num_episodes}")
         self._call_callbacks("on_training_start")
         n_env = self.env_manager.n_envs
-
         episodes_finished = 0
         total_return = 0.0
 
@@ -91,18 +97,20 @@ class SimulatorRL:
                 actions = self.agent.choose_action(obs)
                 next_obs, rewards, dones, infos = self.env_manager.step(actions)
 
+                ep_return += rewards
+
                 # Handle finished episodes
                 for i in range(n_env):
                     if dones[i]:
-                        total_return += ep_return[i]
                         episodes_finished += 1
+                        total_return += ep_return[i]
+                        ep_return[i] = 0.0
 
-                # If return false stop training
                 if not self._call_callbacks("on_step",
-                                     action=actions,
-                                     reward=rewards,
-                                     next_obs=next_obs,
-                                     done=dones):
+                                            action=actions,
+                                            reward=rewards,
+                                            next_obs=next_obs,
+                                            done=dones):
                     break
 
                 if training:
@@ -115,18 +123,17 @@ class SimulatorRL:
                 obs = next_obs
 
         except StopIteration:
-            logger.info(f"[{self.experiment_id}] Early stopping triggered!")
+            print("Early stopping triggered!")
         except KeyboardInterrupt:
-            logger.info(f"[{self.experiment_id}] Training interrupted by user!")
-        # except Exception as e:
-        #    print(f"General error: {e}")
+            print("Training interrupted by user!")
 
         if self.save_model:
             print("Saving agent ... TODO")
-            # self.agent.save("agent_checkpoint.pt")  # TODO: hook into your path logic
 
         self._call_callbacks("on_training_end")
         self.env_manager.close()
+
+        return total_return / num_episodes
 
 
 @hydra.main(config_path="../../conf", config_name="config.yaml", version_base=None)
