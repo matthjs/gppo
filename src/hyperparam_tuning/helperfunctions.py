@@ -15,6 +15,7 @@ from src.simulation.callbacks.abstractcallback import AbstractCallback
 
 
 def train_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
+                   exp_id: str = "hyperopt_exp",
                    agent_id: Optional[str] = None,
                    callbacks: Optional[list[AbstractCallback]] = None,
                    normalize_obs: bool = True) -> Dict[str, float]:
@@ -32,9 +33,9 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
                              env_fn=lambda: gym.make(env_id),
                              n_envs=params.get("n_envs", 1),
                              norm_obs=normalize_obs)
-
+    print(params["num_episodes"])
     simulator = SimulatorRL(
-        experiment_id=params.get("experiment_id", "default_exp"),
+        experiment_id=exp_id,
         agent_id=agent_id if agent_id is not None else type(agent).__name__,
         env_manager=env_manager,
         agent=agent,
@@ -51,6 +52,7 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
 
 
 def eval_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
+                  exp_id: str = "hyperopt_exp",
                   agent_id: Optional[str] = None,
                   callbacks: Optional[list[AbstractCallback]] = None,
                   normalize_obs: bool = True) -> Dict[str, float]:
@@ -70,7 +72,7 @@ def eval_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
                              norm_obs=normalize_obs)
 
     simulator = SimulatorRL(
-        experiment_id=params.get("experiment_id", "default_exp"),
+        experiment_id=exp_id,
         agent_id=agent_id if agent_id is not None else type(agent).__name__,
         env_manager=env_manager,
         agent=agent,

@@ -16,13 +16,15 @@ hpo:
       type: fixed
       value: 512
       value_type: int
-    - name: memory_size
-      type: fixed
-      value: 512
+    - name: n_steps
+      type: range
+      bounds:
+        - 64
+        - 256
       value_type: int
     - name: num_episodes
       type: fixed
-      value: 1000
+      value: 10000
       value_type: int
     - name: beta
       type: fixed
@@ -92,4 +94,4 @@ hpo:
       value_type: int
   objective_name: "return"
   minimize: false
-  n_trials: 30
+  n_trials: 25

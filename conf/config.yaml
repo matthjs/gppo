@@ -1,15 +1,15 @@
 defaults:
-  - mode: train # Set a default mode value, it can be overridden by command-line args
-  - agent: sb_ppo
+  - mode: hpo_gppo # Set a default mode value, it can be overridden by command-line args
+  - agent: gppo_walker2d
   - _self_
 
-exp_id: "test_experiment_tmp"
+exp_id: "hyperparam_tuning"
 
 # Common hyperparameters (can be overridden)
-num_episodes: 1000
+num_episodes: 10000
 num_bootstrap_samples: 100
 num_runs: 1
-n_envs: 1
+n_envs: 8
 results_save_path: "./results/"
 environment: "Walker2d-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
@@ -18,7 +18,7 @@ normalize_act: False   # Rescale to [-1,1]
 clip_obs: 10.0 #1.0   #
 
 early_stopping:
-  enable: False
+  enable: True
   early_stop_check: 3000
   early_stop_window: 50
   early_stop_threshold: 200
@@ -26,7 +26,7 @@ early_stopping:
 wandb:
   project: "gppo-drl"
   entity: "ml_exp"
-  use_wandb: False
+  use_wandb: True
 
 # Hydra plugin settings
 # hydra:

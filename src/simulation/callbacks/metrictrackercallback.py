@@ -64,8 +64,9 @@ class MetricTrackerCallback(AbstractCallback):
                 self.episodes_finished += 1
                 logger.info(f"Episode {self.episodes_finished} finished with return {self.episode_returns[i]:.2f}")
                 self.episode_returns[i] = 0.0  # reset for next episode
-                self.metrics_tracker.record_metric("return", agent_id=self.agent_id,
-                                         episode_idx=self.episodes_finished, value=episode_return, run_id=self.run_id)
+                if self.metrics_tracker:
+                    self.metrics_tracker.record_metric("return", agent_id=self.agent_id,
+                                            episode_idx=self.episodes_finished, value=episode_return, run_id=self.run_id)
         return True
     
     def on_learn(self, learning_info) -> None:

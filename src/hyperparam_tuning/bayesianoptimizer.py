@@ -14,10 +14,11 @@ from src.agents.agent import Agent
 from src.util.wandblogger import WandbLogger
 import warnings
 
+# Suppress only RuntimeWarnings from BoTorch
 warnings.filterwarnings(
-    "once",
+    "ignore",
     category=RuntimeWarning,
-    message=r"If using a 2-dim `batch_initial_conditions`.*"
+    message=r".*If using a 2-dim `batch_initial_conditions`.*"
 )
 
 

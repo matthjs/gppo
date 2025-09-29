@@ -53,7 +53,7 @@ def main(cfg: DictConfig):
             for run_idx in range(cfg.num_runs):
                 # Log each run
                 info_env = gym.make(cfg.environment)
-                agent = AgentFactory.create_agent(
+                agent = AgentFactory.create_cfagent(
                     cfg.agent.agent_type,
                     info_env,
                     cfg.n_envs,
@@ -128,10 +128,24 @@ def main(cfg: DictConfig):
         bo = BayesianOptimizer(
             search_space=OmegaConf.to_container(cfg.mode.hpo.search_space, resolve=True),
             model_factory=partial(create_rl_agent, env=info_env),
-            train_fn=partial(train_rl_agent, env_id=cfg.environment, agent_id=cfg.agent.agent_type,
+            train_fn=partial(train_rl_agent, exp_id=cfg.exp_id, env_id=cfg.environment, agent_id=cfg.agent.agent_type,
                              normalize_obs=cfg.normalize_obs,
-                             callbacks=[early_stop_cb] if early_stop_cb else None),   # We only are interested in the early_stop callback here.
-            eval_fn=partial(eval_rl_agent, env_id=cfg.environment, agent_id=cfg.agent.agent_type),
+                             callbacks=[early_stop_cb,
+                                            VecNormalizeCallback(
+                                                save_base=cfg.results_save_path,
+                                                run_id=0,
+                                                load_on_start=False,    # For now just always set it to false
+                                                save_on_end=True   # For now, always do this
+                                        ),
+                                        MetricTrackerCallback(run_id=0)] if early_stop_cb else None),   # We only are interested in the early_stop callback here.
+            eval_fn=partial(eval_rl_agent, callbacks=[
+                                            VecNormalizeCallback(
+                                                save_base=cfg.results_save_path,
+                                                run_id=0,
+                                                load_on_start=True,    # For now just always set it to false
+                                                save_on_end=False   # For now, always do this
+                                        ),
+                MetricTrackerCallback(run_id=0)], exp_id=cfg.exp_id, env_id=cfg.environment, agent_id=cfg.agent.agent_type),
             objective_name=cfg.mode.hpo.objective_name,
             minimize=cfg.mode.hpo.minimize,
             wandb_logger=logger,

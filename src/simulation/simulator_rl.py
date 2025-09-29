@@ -67,6 +67,7 @@ class SimulatorRL:
             return self._env_interaction(self.num_episodes, training=True)
 
     def evaluate(self, num_eval_episodes) -> float:
+        self._call_callbacks("init_callback", data=SimulatorRLData(self))
         return self._env_interaction(num_eval_episodes, training=False)
 
     def _train_sb3(self, num_episodes: int = 10):
