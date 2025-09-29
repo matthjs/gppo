@@ -136,16 +136,14 @@ def main(cfg: DictConfig):
                                                 run_id=0,
                                                 load_on_start=False,    # For now just always set it to false
                                                 save_on_end=True   # For now, always do this
-                                        ),
-                                        MetricTrackerCallback(run_id=0)] if early_stop_cb else None),   # We only are interested in the early_stop callback here.
+                                        )] if early_stop_cb else None),   # We only are interested in the early_stop callback here.
             eval_fn=partial(eval_rl_agent, callbacks=[
                                             VecNormalizeCallback(
                                                 save_base=cfg.results_save_path,
                                                 run_id=0,
                                                 load_on_start=True,    # For now just always set it to false
                                                 save_on_end=False   # For now, always do this
-                                        ),
-                MetricTrackerCallback(run_id=0)], exp_id=cfg.exp_id, env_id=cfg.environment, agent_id=cfg.agent.agent_type),
+                                        )], exp_id=cfg.exp_id, env_id=cfg.environment, agent_id=cfg.agent.agent_type),
             objective_name=cfg.mode.hpo.objective_name,
             minimize=cfg.mode.hpo.minimize,
             wandb_logger=logger,
