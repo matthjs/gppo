@@ -29,7 +29,6 @@ class EarlyStopCallback(AbstractCallback):
         self.n_env = data.n_env
         self.episode_returns = np.zeros(self.n_env, dtype=np.float32)
         self.episodes_finished = 0
-        # self.stop_triggered = False
 
     def on_step(self, action, reward, next_obs, done) -> bool:
         super().on_step(action, reward, next_obs, done)
