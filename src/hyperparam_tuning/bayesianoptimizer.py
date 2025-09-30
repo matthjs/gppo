@@ -69,6 +69,7 @@ class BayesianOptimizer:
         self.objective_name = objective_name
         self.minimize = minimize
         self.save_path = save_path
+        self.trail_scores = {}    # There might be a better way to do this via Ax
 
         # Initialize hyperparameter tuning experiment. We want to find the optimal set of
         # hyperparameters such that an objective is minimized (or maximized)
@@ -108,7 +109,11 @@ class BayesianOptimizer:
                 raw_data=metrics[self.objective_name]
             )
 
+            self.trail_scores[trial_idx] = metrics[self.objective_name]
+
         best = self.get_best_parameters()
+        max_key = max(self.trail_scores, key=self.trail_scores.get)
+        print(f"Best trial {max_key} with {self.objective_name}: {self.trail_scores[max_key]}")
         if self.logger and self.save_path:
             os.makedirs(self.save_path, exist_ok=True)
             path = os.path.join(self.save_path, "best_hyperparams.json")
@@ -120,6 +125,7 @@ class BayesianOptimizer:
 
     def get_best_parameters(self) -> Dict[str, Any]:
         """Return best parameters found"""
+        print(self.ax_client.get_best_parameters())
         return self.ax_client.get_best_parameters()[0]
 
     @property

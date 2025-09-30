@@ -130,13 +130,13 @@ def main(cfg: DictConfig):
             model_factory=partial(create_rl_agent, env=info_env),
             train_fn=partial(train_rl_agent, exp_id=cfg.exp_id, env_id=cfg.environment, agent_id=cfg.agent.agent_type,
                              normalize_obs=cfg.normalize_obs,
-                             callbacks=[early_stop_cb,
+                             callbacks=[early_stop_cb if early_stop_cb else None,
                                             VecNormalizeCallback(
                                                 save_base=cfg.results_save_path,
-                                                run_id=0,
+                                                run_id=0,   # Only one run per trail, just name it 0
                                                 load_on_start=False,    # For now just always set it to false
                                                 save_on_end=True   # For now, always do this
-                                        )] if early_stop_cb else None),   # We only are interested in the early_stop callback here.
+                                        )]),
             eval_fn=partial(eval_rl_agent, callbacks=[
                                             VecNormalizeCallback(
                                                 save_base=cfg.results_save_path,
