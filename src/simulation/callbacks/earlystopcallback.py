@@ -29,6 +29,7 @@ class EarlyStopCallback(AbstractCallback):
         self.n_env = data.n_env
         self.episode_returns = np.zeros(self.n_env, dtype=np.float32)
         self.episodes_finished = 0
+        # self.stop_triggered = False
 
     def on_step(self, action, reward, next_obs, done) -> bool:
         super().on_step(action, reward, next_obs, done)
@@ -51,10 +52,9 @@ class EarlyStopCallback(AbstractCallback):
                     )
                     if avg_recent < self.early_stop_threshold:
                         logger.warning(f"Early stopping triggered at episode {self.episodes_finished}")
-                        self.stop_triggered = True
                         return False
 
-        return not self.stop_triggered
+        return True
 
     def on_episode_end(self) -> None:
         super().on_episode_end()
