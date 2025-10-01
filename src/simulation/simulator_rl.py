@@ -124,11 +124,11 @@ class SimulatorRL:
                 obs = next_obs
 
         except StopIteration:
-            logger.info("[{self.experiment_id}] Early stopping triggered!")
+            logger.info(f"[{self.experiment_id}] Early stopping triggered!")
         except KeyboardInterrupt:
-            logger.info("[{self.experiment_id}] Training interrupted by user!")
+            logger.info(f"[{self.experiment_id}] Training interrupted by user!")
         except SystemExit:
-            logger.info("[{self.experiment_id}] SystemExit received, stopping training!")
+            logger.info(f"[{self.experiment_id}] SystemExit received, stopping training!")
 
         self._call_callbacks("on_training_end")
         self.env_manager.close()
