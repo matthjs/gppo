@@ -3,7 +3,7 @@ defaults:
   - agent: gppo_walker2d
   - _self_
 
-exp_id: "hyperparam_tuning_mujoco"
+exp_id: "hyperparam_tuning_mujoco2"
 
 # Common hyperparameters (can be overridden)
 num_episodes: 10000
