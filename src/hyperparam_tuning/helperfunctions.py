@@ -33,7 +33,6 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
                              env_fn=lambda: gym.make(env_id),
                              n_envs=params.get("n_envs", 1),
                              norm_obs=normalize_obs)
-    print(params["num_episodes"])
     simulator = SimulatorRL(
         experiment_id=exp_id,
         agent_id=agent_id if agent_id is not None else type(agent).__name__,

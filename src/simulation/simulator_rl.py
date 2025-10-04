@@ -18,6 +18,7 @@ import gymnasium as gym
 from omegaconf import DictConfig, OmegaConf
 from src.agents.agentfactory import AgentFactory
 from src.util.wandblogger import WandbLogger
+from linear_operator.utils.errors import NotPSDError
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -120,7 +121,6 @@ class SimulatorRL:
                     learning_info = self.agent.learn()
                     self._call_callbacks("on_learn",
                                          learning_info=learning_info)
-
                 obs = next_obs
 
         except StopIteration:
@@ -129,6 +129,9 @@ class SimulatorRL:
             logger.info(f"[{self.experiment_id}] Training interrupted by user!")
         except SystemExit:
             logger.info(f"[{self.experiment_id}] SystemExit received, stopping training!")
+        except Exception as e:
+            logger.info(f"[{self.experiment_id}] Other error: {e}, return value total_return/num_episodes will be set to 0")
+            total_return = 0
 
         self._call_callbacks("on_training_end")
         self.env_manager.close()

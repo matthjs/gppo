@@ -13,6 +13,7 @@ from src.simulation.callbacks.vecnormalizecallback import VecNormalizeCallback
 from src.simulation.callbacks.wandbcallback import WandbCallback
 from src.simulation.envmanager import EnvManager
 from src.simulation.simulator_rl import SimulatorRL
+from src.util.eval import evaluation_exp
 from src.util.wandblogger import WandbLogger
 from src.simulation.callbacks.earlystopcallback import EarlyStopCallback
 
@@ -112,7 +113,7 @@ def main(cfg: DictConfig):
         else:
             print("No training, running metric tracker plotting method...")
             tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
-            # Maybe also run sim.evaluate(...)?
+            # Maybe also run sim.evaluate(...)?            
     elif cfg.mode.name == 'hpo' or cfg.mode.name == 'hpo_gppo':
         # For now, use the legacy WandbLogger class.
         logger = WandbLogger(
@@ -152,6 +153,8 @@ def main(cfg: DictConfig):
         best = bo.optimize(n_trials=cfg.mode.hpo.n_trials)
         print("Best hyperparameters found:", best)
         logger.finish()
+    elif cfg.mode.name == "eval":
+        evaluation_exp(cfg)
 
 
 if __name__ == '__main__':
