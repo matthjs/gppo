@@ -1,7 +1,9 @@
 import os
 from functools import partial
+from typing import Callable, Optional
 import hydra
 import gymnasium as gym
+import numpy as np
 from omegaconf import DictConfig, OmegaConf
 from src.agents.agentfactory import AgentFactory
 from src.hyperparam_tuning.helperfunctions import eval_rl_agent, train_rl_agent, create_rl_agent
@@ -17,6 +19,111 @@ from src.util.eval import evaluation_exp
 from src.util.wandblogger import WandbLogger
 from src.simulation.callbacks.earlystopcallback import EarlyStopCallback
 
+def make_simulator(
+    cfg: DictConfig,
+    agent_id: str,
+    exp_id: str,
+    run_idx: int,
+    tracker: MetricsTracker,
+    early_stop_cb: Optional[EarlyStopCallback],
+    env_fn: Callable[[], gym.Env],
+) -> SimulatorRL:
+    """
+    Factory function to create a SimulatorRL instance with agent, environment manager, and callbacks.
+    """
+    # Log each run
+    info_env = gym.make(cfg.environment)
+    agent = AgentFactory.create_agent(
+        cfg.agent.agent_type,
+        info_env,
+        cfg.n_envs,
+        OmegaConf.to_container(cfg.agent.agent_params, resolve=True)
+    )
+    env_manager = EnvManager(
+        env_id=cfg.environment,
+        env_fn=env_fn,
+        n_envs=cfg.n_envs,
+        use_subproc=True,
+        norm_obs=cfg.normalize_obs
+    )
+
+    # ---- Callbacks ----
+    callbacks = []
+    # Use MetricTracker?
+    cb = MetricTrackerCallback(metric_tracker=tracker, run_id=run_idx)
+    if cfg.wandb.use_wandb:
+        # Also put metrics in Wandb?
+        wandb_callback = WandbCallback(
+            metric_callback=cb,
+            project=cfg.wandb.project,
+            entity=cfg.wandb.entity,
+            config=dict(cfg),
+            run_name=cfg.exp_id + f"{cfg.agent.agent_type}_run{run_idx}",
+            plot_dir=cfg.results_save_path  # Log plots from the results save path
+        )
+        callbacks.append(wandb_callback)
+    else:
+        callbacks.append(cb)
+    # Put early stopping condition?
+    if early_stop_cb:
+        callbacks.append(early_stop_cb)
+    # Save and/or load model/RL agent?
+    if cfg.mode.save_model or cfg.mode.load_model:
+        callbacks.append(
+            AgentCheckpointCallback(
+                save_base=cfg.results_save_path,
+                run_id=run_idx,   # Result will be saved per run
+                load_on_start=cfg.mode.load_model,
+                save_on_end=cfg.mode.save_model,
+            )
+        )
+    # Save and/or load VecNormalize stats?
+    if cfg.normalize_obs:
+        callbacks.append(
+            VecNormalizeCallback(
+                save_base=cfg.results_save_path,
+                run_id=run_idx,
+                load_on_start=False,    # For now just always set it to false
+                save_on_end=True   # For now, always do this
+            )
+        )
+
+    sim = SimulatorRL(
+        exp_id,
+        agent_id,
+        env_manager,
+        agent,
+        num_episodes=cfg.num_episodes,
+        callbacks=callbacks
+    )
+
+    return sim
+
+
+def execute_runs(cfg: DictConfig,
+                 agent_id: str,
+                 exp_id: str,
+                 tracker: MetricsTracker,
+                 early_stop_cb,
+                 env_fn,
+                 train):
+    """
+    Train multiple runs of the agent, setting up environments, agents, callbacks, and metrics.
+    """
+    for run_idx in range(cfg.num_runs):
+        # Log each run
+        sim = make_simulator(cfg, agent_id, exp_id, run_idx, tracker,
+                       early_stop_cb, env_fn)
+        if train:
+            sim.train()
+        else:
+            sim.evaluate(cfg.mode.eval_episodes)
+
+def make_tweaked_mujoco_env(cfg):
+    env = gym.make(cfg.environment)
+    base_env = env.unwrapped
+    base_env.model.opt.gravity[:] = np.array([0.0, 0.0, -1.62])
+    return env
 
 @hydra.main(config_path="../conf", config_name="config.yaml", version_base=None)
 def main(cfg: DictConfig):
@@ -36,7 +143,7 @@ def main(cfg: DictConfig):
             early_stop_threshold=cfg.early_stopping.early_stop_threshold
         )
 
-    if cfg.mode.name == 'train':
+    if cfg.mode.name == 'train' or cfg.mode.name == 'eval':
         # metrics_path = os.path.join(cfg.results_save_path, "metrics.json")
         exp_id = cfg.exp_id
         metrics_path = os.path.join(cfg.results_save_path, exp_id)
@@ -50,69 +157,28 @@ def main(cfg: DictConfig):
                     print(f"No existing metrics found for agent {agent_name} in {metrics_path}. Skipping.")
         tracker.set_save_path(cfg.results_save_path)
 
-        if cfg.mode.train:
-            for run_idx in range(cfg.num_runs):
-                # Log each run
-                info_env = gym.make(cfg.environment)
-                agent = AgentFactory.create_cfagent(
-                    cfg.agent.agent_type,
-                    info_env,
-                    cfg.n_envs,
-                    OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
-                env_manager = EnvManager(
-                    env_id=cfg.environment,
-                    env_fn=lambda: gym.make(cfg.environment),
-                    n_envs=cfg.n_envs,
-                    use_subproc=True,
-                    norm_obs=cfg.normalize_obs
-                )
-
-                # ---- Callbacks ----
-                callbacks=[]
-                # Use MetricTracker?
-                cb = MetricTrackerCallback(metric_tracker=tracker, run_id=run_idx)
-                if cfg.wandb.use_wandb:
-                    # Also put metrics in Wandb?
-                    wandb_callback = WandbCallback(
-                        metric_callback=cb,
-                        project=cfg.wandb.project,
-                        entity=cfg.wandb.entity,
-                        config=dict(cfg),
-                        run_name=cfg.exp_id + f"{cfg.agent.agent_type}_run{run_idx}",
-                        plot_dir=cfg.results_save_path  # Log plots from the results save path
-                    )
-                    callbacks.append(wandb_callback)
-                else:
-                    callbacks.append(cb)
-                # Put early stopping condition?
-                if early_stop_cb:
-                    callbacks.append(early_stop_cb)
-                # Save and/or load model/RL agent?
-                if cfg.mode.save_model or cfg.mode.load_model:
-                    callbacks.append(
-                        AgentCheckpointCallback(
-                            save_base=cfg.results_save_path,
-                            run_id=run_idx,   # Result will be saved per run
-                            load_on_start=cfg.mode.load_model,
-                            save_on_end=cfg.mode.save_model,
-                    ))
-                # Save and/or load VecNormalize stats?
-                if cfg.normalize_obs:
-                    callbacks.append(
-                        VecNormalizeCallback(
-                            save_base=cfg.results_save_path,
-                            run_id=run_idx,
-                            load_on_start=False,    # For now just always set it to false
-                            save_on_end=True   # For now, always do this
-                    ))
-
-                sim = SimulatorRL(exp_id, cfg.agent.agent_type, env_manager, agent,
-                                  num_episodes=cfg.num_episodes,
-                                  callbacks=callbacks)
-                sim.train()
-        else:
-            print("No training, running metric tracker plotting method...")
-            tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
+        # NOTE: This is turning into spaghetti code fix this later
+        if cfg.mode.name == "train":
+            if cfg.mode.execute:
+                execute_runs(cfg,
+                             cfg.agent.agent_type,
+                             exp_id,
+                             tracker,
+                             early_stop_cb,
+                             env_fn=lambda: gym.make(cfg.environment), train=True)
+            else:
+                print("No training, running metric tracker plotting method...")
+                tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
+        elif cfg.mode.name == "eval":
+            if cfg.mode.execute:
+                # Hardcode this for now
+                # save_path = os.path.join(cfg.results_save_path, "eval")
+                # tracker.set_save_path(save_path)
+                # execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False)
+                # TODO: UPDATE THIS
+                execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: make_tweaked_mujoco_env(cfg), train=False)
+            else:
+                tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
             # Maybe also run sim.evaluate(...)?            
     elif cfg.mode.name == 'hpo' or cfg.mode.name == 'hpo_gppo':
         # For now, use the legacy WandbLogger class.
