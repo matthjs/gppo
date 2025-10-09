@@ -5,7 +5,22 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 
 
 class Agent(ABC):
-    # True interface, no implemented methods or constructor.
+    def __init__(self):
+        super().__init__()
+        self.training = True
+
+    def disable_training(self) -> None:
+        """
+        Disable training for the agent.
+        """
+        self.training = False
+
+    def enable_training(self) -> None:
+        """
+        Enable training for the agent.
+        """
+        self.training = True
+
     @abstractmethod
     def choose_action(
             self,

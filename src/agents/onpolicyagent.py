@@ -17,6 +17,7 @@ class OnPolicyAgent(Agent, ABC):
                  learning_rate: float,
                  discount_factor: float,
                  device: torch.device):
+        super().__init__()
         self.state_dimensions = state_dimensions
         self.action_dimensions = action_dimensions
         self.memory_size = memory_size

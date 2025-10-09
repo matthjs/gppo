@@ -13,6 +13,8 @@ from src.util.network import ActorCriticMLP
 
 class PPOAgent(OnPolicyAgent):
     """
+    Deprecated
+    
     Implementation of PPO. Note it currently does not support
     changing the default MLP neural network architecture ([64,64]) (this can easily be changed
     by adding it as a parameter to the constructor) and does not support discrete action spaces.

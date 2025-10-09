@@ -65,11 +65,12 @@ class SimulatorRL:
             self._train_sb3(self.num_episodes)
             return None
         else:
-            return self._env_interaction(self.num_episodes, training=True)
+            return self._env_interaction(self.num_episodes)
 
     def evaluate(self, num_eval_episodes) -> float:
         self._call_callbacks("init_callback", data=SimulatorRLData(self))
-        return self._env_interaction(num_eval_episodes, training=False)
+        self.agent.disable_training()
+        return self._env_interaction(num_eval_episodes)
 
     def _train_sb3(self, num_episodes: int = 10):
         logger.info("[{self.experiment_id}] Delegating training to SB3 agent.learn")
@@ -81,11 +82,11 @@ class SimulatorRL:
 
         model.learn(total_timesteps=4242424242424, callback=sb_callbacks)
 
-    def _env_interaction(self, num_episodes: int, training: bool = True) -> float:
+    def _env_interaction(self, num_episodes: int) -> float:
         """
         This method assumes we are running on episodic environments.
         """
-        logger.info(f"[{self.experiment_id}] Running custom {'training' if training else 'evaluation'} loop: total_episodes={num_episodes}")
+        logger.info(f"[{self.experiment_id}] Running custom loop: total_episodes={num_episodes}")
         self._call_callbacks("on_training_start")
         n_env = self.env_manager.n_envs
         episodes_finished = 0
@@ -98,6 +99,7 @@ class SimulatorRL:
             while episodes_finished < num_episodes:
                 actions = self.agent.choose_action(obs)
                 next_obs, rewards, dones, infos = self.env_manager.step(actions)
+                self.env_manager.render()
 
                 ep_return += rewards
 
@@ -115,12 +117,11 @@ class SimulatorRL:
                                             done=dones):
                     break
 
-                if training:
-                    self.agent.store_transition(obs, actions, rewards, next_obs, dones)
-                    self.agent.update()
-                    learning_info = self.agent.learn()
-                    self._call_callbacks("on_learn",
-                                         learning_info=learning_info)
+                self.agent.store_transition(obs, actions, rewards, next_obs, dones)
+                self.agent.update()
+                learning_info = self.agent.learn()
+                self._call_callbacks("on_learn",
+                                    learning_info=learning_info)
                 obs = next_obs
 
         except StopIteration:

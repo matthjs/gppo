@@ -110,7 +110,7 @@ def execute_runs(cfg: DictConfig,
     """
     Train multiple runs of the agent, setting up environments, agents, callbacks, and metrics.
     """
-    for run_idx in range(cfg.num_runs):
+    for run_idx in range(cfg.num_runs if train else cfg.mode.eval_runs):
         # Log each run
         sim = make_simulator(cfg, agent_id, exp_id, run_idx, tracker,
                        early_stop_cb, env_fn)
@@ -120,7 +120,8 @@ def execute_runs(cfg: DictConfig,
             sim.evaluate(cfg.mode.eval_episodes)
 
 def make_tweaked_mujoco_env(cfg):
-    env = gym.make(cfg.environment)
+    env = gym.make(cfg.environment)   # render_mode="human"
+    env.reset()
     base_env = env.unwrapped
     base_env.model.opt.gravity[:] = np.array([0.0, 0.0, -1.62])
     return env
@@ -172,10 +173,12 @@ def main(cfg: DictConfig):
         elif cfg.mode.name == "eval":
             if cfg.mode.execute:
                 # Hardcode this for now
-                # save_path = os.path.join(cfg.results_save_path, "eval")
-                # tracker.set_save_path(save_path)
-                # execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False)
+                save_path = os.path.join(cfg.results_save_path, "eval")
+                tracker.set_save_path(save_path)
+                execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False)
                 # TODO: UPDATE THIS
+                save_path = os.path.join(cfg.results_save_path, "adjusted gravity")
+                tracker.set_save_path(save_path)
                 execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: make_tweaked_mujoco_env(cfg), train=False)
             else:
                 tracker.save_env_aggregated_plots(metrics_path, cfg.environment)

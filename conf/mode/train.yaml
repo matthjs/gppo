@@ -1,6 +1,6 @@
 name: train
 
-train: True
+execute: True
 load_model: True
 save_model: True
 model_path: "../models"   # e.g., /models/gppo/file.pth

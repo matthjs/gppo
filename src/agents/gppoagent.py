@@ -233,10 +233,11 @@ class GPPOAgent(OnPolicyAgent):
                 info["value_loss"] += value_loss.item()
                 info["policy_loss"] += policy_loss.item()
                 info["entropy"] += entropy.item()
-                self.optimizer.zero_grad()
-                loss.backward()
-                nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-                self.optimizer.step()
+                if self.training:
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+                    self.optimizer.step()
 
         self.rollout_buffer.clear()
         info["loss"] = float(np.mean(losses))
@@ -253,6 +254,8 @@ class GPPOAgent(OnPolicyAgent):
                 'state_dimensions': self.state_dimensions,
                 'action_dimensions': self.action_dimensions,
                 'learning_rate': self.learning_rate,
+                'n_steps': self.n_steps,
+                "n_envs": self.n_envs,
                 'n_epochs': self.n_epochs,
                 'gae_lambda': self.gae_lambda,
                 'clip_range': self.clip_range,
