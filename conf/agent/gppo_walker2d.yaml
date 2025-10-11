@@ -1,26 +1,26 @@
 agent_type: "GPPO"
 
 agent_params:
-    n_steps: 64
+    n_steps: 256
     batch_size: 512
-    learning_rate: 0.002913
-    n_epochs: 8
+    learning_rate: 0.005751
+    n_epochs: 9
     gamma: 0.999
     gae_lambda: 0.9
-    clip_range: 0.1
-    clip_range_vf: null         # corresponds to Optional[float] = None
-    ent_coef: 0.0 # 0.000585045
-    vf_coef: 0.73973
-    max_grad_norm: 0.425093
+    clip_range: 0.350164
+    clip_range_vf: null
+    ent_coef: 0.001684
+    vf_coef: 0.835695
+    max_grad_norm: 0.664338
     num_inducing_points: 128
     num_quad_sites: 8
-    beta: 0.5 # 0.825162386521697
-    sample_vf: True,
+    beta: 0.5
+    sample_vf: True
     hidden_layers_config:
-        - output_dims: 6 # 1 # 6
+        - output_dims: 6
           mean_type: "linear"
     policy_hidden_config:
-        - output_dims: 6 # null # 6
+        - output_dims: 6
           mean_type: "constant"
     value_hidden_config:
         - output_dims: null

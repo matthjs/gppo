@@ -99,7 +99,7 @@ class SimulatorRL:
             while episodes_finished < num_episodes:
                 actions = self.agent.choose_action(obs)
                 next_obs, rewards, dones, infos = self.env_manager.step(actions)
-                self.env_manager.render()
+                # self.env_manager.render()
 
                 ep_return += rewards
 

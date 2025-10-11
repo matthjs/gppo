@@ -6,7 +6,7 @@ save_model: False
 model_path: "../models"   # e.g., /models/gppo/file.pth
 import_metrics: False
 export_metrics: True
-eval_episodes: 10
+eval_episodes: 50
 eval_runs: 1
 # List of agents to import/enable
 agents:

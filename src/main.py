@@ -18,6 +18,7 @@ from src.simulation.simulator_rl import SimulatorRL
 from src.util.eval import evaluation_exp
 from src.util.wandblogger import WandbLogger
 from src.simulation.callbacks.earlystopcallback import EarlyStopCallback
+from src.simulation.callbacks.valuecalibrationcallback import ValueCalibrationCallback
 
 def make_simulator(
     cfg: DictConfig,
@@ -27,6 +28,7 @@ def make_simulator(
     tracker: MetricsTracker,
     early_stop_cb: Optional[EarlyStopCallback],
     env_fn: Callable[[], gym.Env],
+    train: bool
 ) -> SimulatorRL:
     """
     Factory function to create a SimulatorRL instance with agent, environment manager, and callbacks.
@@ -83,10 +85,19 @@ def make_simulator(
             VecNormalizeCallback(
                 save_base=cfg.results_save_path,
                 run_id=run_idx,
-                load_on_start=False,    # For now just always set it to false
+                load_on_start=False if train else True,    # For now just always set it to false
                 save_on_end=True   # For now, always do this
             )
         )
+
+    if not train:
+        calibration_cb = ValueCalibrationCallback(
+            run_id=run_idx,
+            save_path=os.path.join(cfg.results_save_path, exp_id, "calibration"),
+            # min_episodes_for_calibration=cfg.mode.eval_episodes,
+            compute_on_end=True  # Compute at end of training/eval
+        )
+        callbacks.append(calibration_cb)
 
     sim = SimulatorRL(
         exp_id,
@@ -113,7 +124,7 @@ def execute_runs(cfg: DictConfig,
     for run_idx in range(cfg.num_runs if train else cfg.mode.eval_runs):
         # Log each run
         sim = make_simulator(cfg, agent_id, exp_id, run_idx, tracker,
-                       early_stop_cb, env_fn)
+                       early_stop_cb, env_fn, train)
         if train:
             sim.train()
         else:
@@ -177,9 +188,9 @@ def main(cfg: DictConfig):
                 tracker.set_save_path(save_path)
                 execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False)
                 # TODO: UPDATE THIS
-                save_path = os.path.join(cfg.results_save_path, "adjusted gravity")
-                tracker.set_save_path(save_path)
-                execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: make_tweaked_mujoco_env(cfg), train=False)
+                # save_path = os.path.join(cfg.results_save_path, "adjusted gravity")
+                # tracker.set_save_path(save_path)
+                # execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: make_tweaked_mujoco_env(cfg), train=False)
             else:
                 tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
             # Maybe also run sim.evaluate(...)?            
