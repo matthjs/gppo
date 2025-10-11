@@ -20,7 +20,7 @@ hpo:
       type: range
       bounds:
         - 64
-        - 256
+        - 512
       value_type: int
     - name: num_episodes
       type: fixed

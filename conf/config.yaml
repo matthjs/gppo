@@ -3,7 +3,7 @@ defaults:
   - agent: gppo_walker2d
   - _self_
 
-exp_id: "test!" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
+exp_id: "hyperparam_tuning_mujoco6" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
 
 # Common hyperparameters (can be overridden)
 num_episodes: 10000
@@ -26,7 +26,7 @@ early_stopping:
 wandb:
   project: "gppo-drl"
   entity: "ml_exp"
-  use_wandb: False
+  use_wandb: True
 
 # Hydra plugin settings
 # hydra:

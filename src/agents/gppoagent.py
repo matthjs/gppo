@@ -194,7 +194,7 @@ class GPPOAgent(OnPolicyAgent):
         :return: Dictionary with loss and diagnostic statistics.
         """
         self.policy.train()
-        if len(self.rollout_buffer) < self.rollout_buffer.capacity: # self.batch_size:
+        if len(self.rollout_buffer) < self.rollout_buffer.capacity:
             return {}
 
         # Compute last value (this is awkward can this be changed?)
