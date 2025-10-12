@@ -38,6 +38,21 @@ class AbstractCallback(ABC):
     def on_learn(self, learning_info) -> None:
         pass
 
+    def on_rollout_start(self, learning_info = None) -> None:
+        """
+        A rollout is the collection of environment interaction
+        using the current policy.
+        This event is triggered before collecting new samples.
+        learning_info: optional learning information from previous rollout.
+        """
+        pass
+
+    def on_rollout_end(self) -> None:
+        """
+        This event is triggered before updating the policy.
+        """
+        pass
+
     def on_episode_end(self) -> None:
         """
         Callback at the end of an episode.

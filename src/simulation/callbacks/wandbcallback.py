@@ -105,6 +105,13 @@ class WandbCallback(AbstractCallback):
         # Log plots at the end of each episode
         self._log_plots()
 
+    def on_rollout_start(self, learning_info=None):
+        super().on_rollout_start(learning_info)
+        self.metric_callback.on_rollout_start(learning_info)
+
+        if learning_info:
+            wandb.log(learning_info)
+
     def on_learn(self, learning_info):
         """
         Log learning info metrics from the agent to wandb.
