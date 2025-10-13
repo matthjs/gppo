@@ -1,9 +1,9 @@
 defaults:
-  - mode: hpo_gppo  # Set a default mode value, it can be overridden by command-line args
+  - mode: train  # Set a default mode value, it can be overridden by command-line args
   - agent: gppo_walker2d
   - _self_
 
-exp_id: "hyperparam_tuning_mujoco6" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
+exp_id: "mujoco_experiment" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
 
 # Common hyperparameters (can be overridden)
 num_episodes: 10000
