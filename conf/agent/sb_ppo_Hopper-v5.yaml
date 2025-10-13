@@ -1,0 +1,23 @@
+agent_type: "SB_PPO"
+
+agent_params:
+  n_steps: 512
+  batch_size: 32
+  learning_rate: 9.80828e-05
+  n_epochs: 5
+  gamma: 0.999
+  gae_lambda: 0.99
+  clip_range: 0.2
+  clip_range_vf: null
+  ent_coef: 0.00229519
+  vf_coef: 0.835671
+  max_grad_norm: 0.7
+  # n_envs: 1
+  # n_timesteps: !!float 1e6
+  # policy_kwargs:
+  #   net_arch:
+  #     - pi: [256, 256]
+  #       vf: [256, 256]
+  #   activation_fn: "relu"
+  #   ortho_init: false
+  #   log_std_init: -2

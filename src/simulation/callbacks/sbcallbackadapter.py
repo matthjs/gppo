@@ -34,8 +34,11 @@ class SB3CallbackAdapter(BaseCallback):
         # Call the wrapped callback
         continue_training = self.callback.on_step(action, reward, next_obs, done)
         return continue_training
+    
+    def on_rollout_start(self) -> None:
+        self.callback.on_rollout_start()
 
-    def _on_rollout_end(self) -> None:
+    def on_rollout_end(self) -> None:
         """
         Called at the end of a rollout (after collecting experiences).
         Can map to episode end if needed.
@@ -43,7 +46,8 @@ class SB3CallbackAdapter(BaseCallback):
         # Collect learning info from SB3
         learning_info = {} # TODO: For now just make this empty # self.locals.get("infos", [{}])[0]  # SB3 puts info dict in 'infos'
         if isinstance(learning_info, dict) and learning_info:
-            self.callback.on_learn(learning_info)
+            self.callback.on_rollout_end()
+            # self.callback.on_learn(learning_info)
 
     def _on_training_end(self) -> None:
         self.callback.on_training_end()

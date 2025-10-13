@@ -127,7 +127,7 @@ class WandbCallback(AbstractCallback):
         self.metric_callback.on_training_end()
 
         # Final log of plots
-        # self._log_plots()
+        self._log_plots()
 
         # Add all CSVs in the experiment folder
         artifact = wandb.Artifact(f"{self.run_name}_metrics", type="metrics")
