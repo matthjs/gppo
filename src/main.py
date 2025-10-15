@@ -34,19 +34,20 @@ def make_simulator(
     Factory function to create a SimulatorRL instance with agent, environment manager, and callbacks.
     """
     # Log each run
-    info_env = gym.make(cfg.environment)
-    agent = AgentFactory.create_agent(
-        cfg.agent.agent_type,
-        info_env,
-        cfg.n_envs,
-        OmegaConf.to_container(cfg.agent.agent_params, resolve=True)
-    )
     env_manager = EnvManager(
         env_id=cfg.environment,
         env_fn=env_fn,
         n_envs=cfg.n_envs,
         use_subproc=True,
         norm_obs=cfg.normalize_obs
+    )
+    
+    info_env = gym.make(cfg.environment)
+    agent = AgentFactory.create_agent(
+        cfg.agent.agent_type,
+        env_manager.vec_env, # info_env,
+        cfg.n_envs,
+        OmegaConf.to_container(cfg.agent.agent_params, resolve=True)
     )
 
     # ---- Callbacks ----

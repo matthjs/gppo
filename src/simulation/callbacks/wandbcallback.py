@@ -64,11 +64,10 @@ class WandbCallback(AbstractCallback):
         # Delegate metric tracking
         continue_training = self.metric_callback.on_step(action, reward, next_obs, done)
 
-        # Optional step-level logging
-        # Example: log running returns per environment if you want
-        # if hasattr(self.metric_callback, "episode_returns"):
-        #     for i in range(self.metric_callback.n_env):
-        #         wandb.log({f"env_{i}_running_return": self.metric_callback.episode_returns[i]})
+        # step-level logging
+        if hasattr(self.metric_callback, "episode_returns"):
+            for i in range(self.metric_callback.n_env):
+                wandb.log({f"return": self.metric_callback.episode_returns[i]})
 
         return continue_training
     

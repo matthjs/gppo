@@ -58,3 +58,20 @@ class StableBaselinesAdapter(Agent):
         :return: The unwrapped model.
         """
         return self._sb_model
+    
+    def save(self, path: str) -> None:
+        """
+        Save the Stable Baselines model to a file.
+
+        :param path: File path (without extension) to save the model.
+        """
+        self._sb_model.save(path)
+
+    def load(self, path: str) -> None:
+        """
+        Load a Stable Baselines model from a file and update the adapter.
+
+        :param path: File path (without extension) from which to load the model.
+        """
+        model_class = type(self._sb_model)
+        self._sb_model = model_class.load(path)

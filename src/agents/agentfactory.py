@@ -35,20 +35,20 @@ class AgentFactory:
                                     {"output_dims": None, "mean_type": "constant"}],
         },
         3: {
-            "hidden_layers_config": [{"output_dims": 6, "mean_type": "linear"}],
-            "policy_hidden_config": [{"output_dims": 6, "mean_type": "constant"}],
+            "hidden_layers_config": [{"output_dims": 17, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": 17, "mean_type": "constant"}],
             "value_hidden_config": [{"output_dims": None, "mean_type": "constant"}],
         },
         4: {
             "hidden_layers_config": [{"output_dims": 1, "mean_type": "linear"}],
-            "policy_hidden_config": [{"output_dims": 6, "mean_type": "constant"}],
+            "policy_hidden_config": [{"output_dims": 17, "mean_type": "constant"}],
             "value_hidden_config": [{"output_dims": None, "mean_type": "constant"}],
         },
         5: {
-            "hidden_layers_config": [{"output_dims": 6, "mean_type": "linear"},
-                                     {"output_dims": 6, "mean_type": "linear"}],
-            "policy_hidden_config": [{"output_dims": 6, "mean_type": "linear"},
-                                     {"output_dims": 6, "mean_type": "constant"}],
+            "hidden_layers_config": [{"output_dims": 17, "mean_type": "linear"},
+                                     {"output_dims": 17, "mean_type": "linear"}],
+            "policy_hidden_config": [{"output_dims": 17, "mean_type": "linear"},
+                                     {"output_dims": 17, "mean_type": "constant"}],
             "value_hidden_config": [{"output_dims": 1, "mean_type": "linear"},
                                     {"output_dims": None, "mean_type": "constant"}],
         }
