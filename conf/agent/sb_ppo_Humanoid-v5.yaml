@@ -1,7 +1,7 @@
 agent_type: "SB_PPO"
 
 agent_params:
-  n_steps: 512
+  n_steps: 256
   batch_size: 256
   learning_rate: 3.56987e-05
   n_epochs: 5

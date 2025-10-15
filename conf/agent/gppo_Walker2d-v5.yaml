@@ -1,5 +1,6 @@
 agent_type: "GPPO"
 
+# Tuned after Bayesian optimization for 25 trails
 agent_params:
     n_steps: 286
     batch_size: 512
