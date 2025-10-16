@@ -60,13 +60,14 @@ class TimeBudgetCallback(AbstractCallback):
         
         return True  # Continue training
     
-    def on_update_start(self) -> None:
+    def on_rollout_end(self) -> None:
         """Mark the start of a training update (when rollout buffer is full)."""
         self.update_start_time = time.time()
     
-    def on_update_end(self) -> None:
+    def on_rollout_start(self, learning_info = None) -> None:
         """Record training update time (gradient updates, etc.)."""
-        if self.update_start_time is not None:
+        # learning_info not None implies there has been an update
+        if learning_info is not None and self.update_start_time is not None:
             training_time = time.time() - self.update_start_time
             self.training_times.append(training_time)
             self.update_start_time = None

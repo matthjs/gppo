@@ -182,6 +182,9 @@ class GPPOAgent(OnPolicyAgent):
             self.last_value.detach(),
         )
 
+    def full_buffer(self) -> bool:
+        return len(self.rollout_buffer) >= self.rollout_buffer.capacity
+
     def learn(self) -> Dict[str, Any]:
         """
         Usage: run the learn() method at every timestep in the environment,

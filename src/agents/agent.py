@@ -41,6 +41,10 @@ class Agent(ABC):
         pass
 
     @abstractmethod
+    def full_buffer(self) -> bool:
+        pass
+
+    @abstractmethod
     def store_transition(
             self,
             state: np.ndarray,

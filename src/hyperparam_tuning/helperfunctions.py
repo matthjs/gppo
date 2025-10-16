@@ -45,7 +45,7 @@ def train_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
         device=params.get("device", None),
     )
 
-    avg_return = simulator.train()
+    avg_return, _ = simulator.train()
 
     return {"train/avg_return": avg_return} if avg_return is not None else {}
 
@@ -82,7 +82,7 @@ def eval_rl_agent(agent: Agent, params: Dict[str, Any], env_id: str,
         device=params.get("device", None),
     )
 
-    avg_return = simulator.evaluate(num_eval_episodes=params.get("num_eval_episodes", 10))
+    avg_return, _ = simulator.evaluate(num_eval_episodes=params.get("num_eval_episodes", 10))
     return {"return": avg_return}
 
 

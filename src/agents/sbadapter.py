@@ -42,6 +42,9 @@ class StableBaselinesAdapter(Agent):
             observation: np.ndarray
     ) -> Union[int, np.ndarray]:
         return self._sb_model.predict(observation)[0] # [0]
+    
+    def full_buffer(self) -> bool:
+        return self.model.rollout_buffer.full
 
     def is_stable_baselines_wrapper(self) -> bool:
         """

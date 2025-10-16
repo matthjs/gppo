@@ -38,7 +38,7 @@ class AbstractCallback(ABC):
     def on_learn(self, learning_info) -> None:
         pass
 
-    def on_rollout_start(self, learning_info = None) -> None:
+    def on_rollout_start(self) -> None:
         """
         A rollout is the collection of environment interaction
         using the current policy.

@@ -10,6 +10,7 @@ from src.hyperparam_tuning.helperfunctions import eval_rl_agent, train_rl_agent,
 from src.hyperparam_tuning.bayesianoptimizer import BayesianOptimizer
 from src.metrics.metrictrackerNEW import MetricsTracker
 from src.simulation.callbacks.agentcheckpointcallback import AgentCheckpointCallback
+from src.simulation.callbacks.complexitycallback import TimeBudgetCallback
 from src.simulation.callbacks.metrictrackercallback import MetricTrackerCallback
 from src.simulation.callbacks.vecnormalizecallback import VecNormalizeCallback
 from src.simulation.callbacks.wandbcallback import WandbCallback
@@ -85,9 +86,9 @@ def make_simulator(
         callbacks.append(
             VecNormalizeCallback(
                 save_base=cfg.results_save_path,
-                run_id=run_idx,
-                load_on_start=False if train else True,    # For now just always set it to false
-                save_on_end=True   # For now, always do this
+                run_id=cfg.mode.load_run_id if not train else run_idx,
+                load_on_start=False if train else True,
+                save_on_end=True if train else False
             )
         )
 
@@ -99,6 +100,11 @@ def make_simulator(
             compute_on_end=True  # Compute at end of training/eval
         )
         callbacks.append(calibration_cb)
+        # Estimate
+        callbacks.append(
+            TimeBudgetCallback()
+        )
+
 
     sim = SimulatorRL(
         exp_id,

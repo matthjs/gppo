@@ -4,6 +4,7 @@ import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.callbacks import StopTrainingOnMaxEpisodes
+from traitlets import Tuple
 from src.agents.agent import Agent
 from src.agents.sbadapter import StableBaselinesAdapter
 from src.simulation.callbacks.abstractcallback import AbstractCallback
@@ -58,7 +59,7 @@ class SimulatorRL:
                 return_value = return_value and ret
         return return_value
 
-    def train(self) -> Optional[float]:
+    def train(self) -> Optional[Tuple[float, float]]:
         self._call_callbacks("init_callback",
                              data=SimulatorRLData(self))
         if isinstance(self.agent, StableBaselinesAdapter):
@@ -67,10 +68,12 @@ class SimulatorRL:
         else:
             return self._env_interaction(self.num_episodes)
 
-    def evaluate(self, num_eval_episodes) -> float:
+    def evaluate(self, num_eval_episodes) -> Tuple[float, float]:
         self._call_callbacks("init_callback", data=SimulatorRLData(self))
         self.agent.disable_training()
-        return self._env_interaction(num_eval_episodes)
+        ret, std = self._env_interaction(num_eval_episodes)
+        self.agent.enable_training()
+        return ret, std
 
     def _train_sb3(self, num_episodes: int = 10):
         logger.info("[{self.experiment_id}] Delegating training to SB3 agent.learn")
@@ -83,21 +86,23 @@ class SimulatorRL:
 
         model.learn(total_timesteps=4242424242424, callback=sb_callbacks)
 
-    def _env_interaction(self, num_episodes: int) -> float:
+    def _env_interaction(self, num_episodes: int) -> tuple[float, float]:
         """
         This method assumes we are running on episodic environments.
+        Returns the mean and variance of episode returns.
         """
         logger.info(f"[{self.experiment_id}] Running custom loop: total_episodes={num_episodes}")
         self._call_callbacks("on_training_start")
         n_env = self.env_manager.n_envs
         episodes_finished = 0
-        total_return = 0.0
+        episode_returns = []  # store individual episode returns
 
         try:
             obs = self.env_manager.reset()
             ep_return = np.zeros(n_env)
 
             while episodes_finished < num_episodes:
+                self._call_callbacks("on_rollout_start")
                 actions = self.agent.choose_action(obs)
                 next_obs, rewards, dones, infos = self.env_manager.step(actions)
                 # self.env_manager.render()
@@ -108,7 +113,7 @@ class SimulatorRL:
                 for i in range(n_env):
                     if dones[i]:
                         episodes_finished += 1
-                        total_return += ep_return[i]
+                        episode_returns.append(ep_return[i])
                         ep_return[i] = 0.0
 
                 if not self._call_callbacks("on_step",
@@ -120,9 +125,10 @@ class SimulatorRL:
 
                 self.agent.store_transition(obs, actions, rewards, next_obs, dones)
                 self.agent.update()
+                if self.agent.full_buffer:
+                    self._call_callbacks("on_rollout_end")
                 learning_info = self.agent.learn()
-                self._call_callbacks("on_learn",
-                                    learning_info=learning_info)
+                self._call_callbacks("on_learn", learning_info=learning_info)
                 obs = next_obs
 
         except StopIteration:
@@ -132,13 +138,18 @@ class SimulatorRL:
         except SystemExit:
             logger.info(f"[{self.experiment_id}] SystemExit received, stopping training!")
         except Exception as e:
-            logger.info(f"[{self.experiment_id}] Other error: {e}, return value total_return/num_episodes will be set to 0")
-            total_return = 0
+            logger.info(f"[{self.experiment_id}] Other error: {e}, returning zeros for mean and variance.")
+            episode_returns = []
 
         self._call_callbacks("on_training_end")
         self.env_manager.close()
 
-        return total_return / num_episodes
+        if len(episode_returns) == 0:
+            return 0.0, 0.0
+
+        mean_return = np.mean(episode_returns)
+        var_return = np.var(episode_returns)
+        return mean_return, var_return
 
 
 @hydra.main(config_path="../../conf", config_name="config.yaml", version_base=None)

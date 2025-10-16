@@ -2,6 +2,7 @@ name: eval
 
 execute: True
 load_model: True
+load_run_id: 1
 save_model: False
 model_path: "../models"   # e.g., /models/gppo/file.pth
 import_metrics: False
