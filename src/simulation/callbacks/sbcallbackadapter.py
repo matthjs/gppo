@@ -1,5 +1,6 @@
 from stable_baselines3.common.callbacks import BaseCallback
 from src.simulation.callbacks.abstractcallback import AbstractCallback
+from src.simulation.callbacks.complexitycallback import TimeBudgetCallback
 from src.simulation.simulatorldata import SimulatorRLData
 
 
@@ -37,6 +38,14 @@ class SB3CallbackAdapter(BaseCallback):
     
     def on_rollout_start(self) -> None:
         self.callback.on_rollout_start()
+        # A bit hacky but we will haave to do this for now.
+        if isinstance(self.callback, TimeBudgetCallback):
+            self.callback.on_learn({})
+            self.callback.on_training_end()
+
+    # def on_rollout_end(self) -> None:
+    #     """Mark the start of a training update (when rollout buffer is full)."""
+    #    self.callback.on_rollout_end()
 
     def on_rollout_end(self) -> None:
         """
@@ -44,13 +53,21 @@ class SB3CallbackAdapter(BaseCallback):
         Can map to episode end if needed.
         """
         # Collect learning info from SB3
-        learning_info = {} # TODO: For now just make this empty # self.locals.get("infos", [{}])[0]  # SB3 puts info dict in 'infos'
-        if isinstance(learning_info, dict) and learning_info:
-            self.callback.on_rollout_end()
+        self.callback.on_rollout_end()
             # self.callback.on_learn(learning_info)
 
-    def _on_training_end(self) -> None:
-        self.callback.on_training_end()
+    def _on_training_end(self) -> bool:
+        # Called after every gradient update (learning step)
+        # Do your "after update" logic here
+        # print("Learning update finished!")
+        # self.callback.on_learn({})
+        # if isinstance(self.callback, TimeBudgetCallback):
+            # A bit hacky but we will haave to do this for now.
+        #    self.callback.on_training_end()
+        return True
+
+    # def _on_training_end(self) -> None:
+    #    self.callback.on_training_end()
 
     def _on_rollout_start(self) -> None:
         self.callback.on_update_start()

@@ -1,10 +1,9 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import gymnasium as gym
 import numpy as np
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.callbacks import StopTrainingOnMaxEpisodes
-from traitlets import Tuple
 from src.agents.agent import Agent
 from src.agents.sbadapter import StableBaselinesAdapter
 from src.simulation.callbacks.abstractcallback import AbstractCallback
@@ -86,7 +85,7 @@ class SimulatorRL:
 
         model.learn(total_timesteps=4242424242424, callback=sb_callbacks)
 
-    def _env_interaction(self, num_episodes: int) -> tuple[float, float]:
+    def _env_interaction(self, num_episodes: int) -> Tuple[float, float]:
         """
         This method assumes we are running on episodic environments.
         Returns the mean and variance of episode returns.
@@ -125,7 +124,7 @@ class SimulatorRL:
 
                 self.agent.store_transition(obs, actions, rewards, next_obs, dones)
                 self.agent.update()
-                if self.agent.full_buffer:
+                if self.agent.full_buffer():
                     self._call_callbacks("on_rollout_end")
                 learning_info = self.agent.learn()
                 self._call_callbacks("on_learn", learning_info=learning_info)

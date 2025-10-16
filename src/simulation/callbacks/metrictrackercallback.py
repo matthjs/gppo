@@ -69,12 +69,6 @@ class MetricTrackerCallback(AbstractCallback):
                                             episode_idx=self.episodes_finished, value=episode_return, run_id=self.run_id)
         return True
     
-    def on_rollout_start(self, learning_info = None) -> None:
-        super().on_rollout_start(learning_info)
-        if learning_info and self.metrics_tracker:
-            for key, value in learning_info.items():
-                self.metrics_tracker.record_metric(key, self.agent_id, self.episodes_finished, value, run_id=self.run_id)
-    
     def on_learn(self, learning_info) -> None:
         super().on_learn(learning_info)
         if learning_info and self.metrics_tracker:

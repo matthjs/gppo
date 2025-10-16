@@ -105,6 +105,7 @@ def make_simulator(
             TimeBudgetCallback()
         )
 
+    # callbacks.append(TimeBudgetCallback()) TODO: Make this more flexible
 
     sim = SimulatorRL(
         exp_id,
