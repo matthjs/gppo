@@ -100,10 +100,6 @@ def make_simulator(
             compute_on_end=True  # Compute at end of training/eval
         )
         callbacks.append(calibration_cb)
-        # Estimate
-        callbacks.append(
-            TimeBudgetCallback()
-        )
 
     # callbacks.append(TimeBudgetCallback()) TODO: Make this more flexible
 
@@ -129,14 +125,18 @@ def execute_runs(cfg: DictConfig,
     """
     Train multiple runs of the agent, setting up environments, agents, callbacks, and metrics.
     """
+    res = []
+
     for run_idx in range(cfg.num_runs if train else cfg.mode.eval_runs):
         # Log each run
         sim = make_simulator(cfg, agent_id, exp_id, run_idx, tracker,
                        early_stop_cb, env_fn, train)
         if train:
-            sim.train()
+            res.append(sim.train())
         else:
-            sim.evaluate(cfg.mode.eval_episodes)
+            res.append(sim.evaluate(cfg.mode.eval_episodes))
+    
+    return res
 
 def make_tweaked_mujoco_env(cfg):
     env = gym.make(cfg.environment)   # render_mode="human"
@@ -194,7 +194,8 @@ def main(cfg: DictConfig):
                 # Hardcode this for now
                 save_path = os.path.join(cfg.results_save_path, "eval")
                 tracker.set_save_path(save_path)
-                execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False)
+                res = execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False)
+                print(res)
                 # TODO: UPDATE THIS
                 # save_path = os.path.join(cfg.results_save_path, "adjusted gravity")
                 # tracker.set_save_path(save_path)

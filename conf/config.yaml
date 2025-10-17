@@ -8,7 +8,7 @@ exp_id:  "mujoco_experiment_eurips"  # "mujoco_experiment_eurips"  # "test!" # "
 # Common hyperparameters (can be overridden)
 num_episodes: 15000
 num_bootstrap_samples: 100
-num_runs: 3
+num_runs: 1
 n_envs: 8
 results_save_path: "./results/"
 environment: "Humanoid-v5"  # "Walker2d-v5"   # "Humanoid-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
