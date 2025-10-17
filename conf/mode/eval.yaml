@@ -9,6 +9,7 @@ import_metrics: False
 export_metrics: True
 eval_episodes: 100
 eval_runs: 1
+adjust_env: True
 # List of agents to import/enable
 agents:
   - GPPO

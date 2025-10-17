@@ -1,6 +1,6 @@
 defaults:
-  - mode: train  # Set a default mode value, it can be overridden by command-line args
-  - agent: gppo_Humanoid-v5
+  - mode: eval # Set a default mode value, it can be overridden by command-line args
+  - agent: sb_ppo_Walker2d-v5
   - _self_
 
 exp_id:  "mujoco_experiment_eurips"  # "mujoco_experiment_eurips"  # "test!" # "hyperparam_tuning_mujoco5"  # "mujoco_experiment" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
@@ -11,7 +11,7 @@ num_bootstrap_samples: 100
 num_runs: 1
 n_envs: 8
 results_save_path: "./results/"
-environment: "Humanoid-v5"  # "Walker2d-v5"   # "Humanoid-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
+environment: "Walker2d-v5" # "Humanoid-v5"  # "Walker2d-v5"   # "Humanoid-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 normalize_obs: True
 normalize_act: False   # Rescale to [-1,1]
@@ -26,7 +26,7 @@ early_stopping:
 wandb:
   project: "gppo-drl"
   entity: "ml_exp"
-  use_wandb: True
+  use_wandb: False
 
 # Hydra plugin settings
 # hydra:

@@ -1,7 +1,9 @@
 from abc import abstractmethod
 from typing import Dict, Union
 import numpy as np
+from stable_baselines3 import PPO
 from stable_baselines3.common.base_class import BaseAlgorithm
+import torch
 from traitlets import Any
 from src.agents.agent import Agent
 
@@ -18,6 +20,8 @@ class StableBaselinesAdapter(Agent):
         :param model: Stable Baselines model to adapt.
         """
         self._sb_model = model
+        # self.entropy_values = []
+        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def store_transition(
             self,
@@ -35,16 +39,28 @@ class StableBaselinesAdapter(Agent):
         This method should be implemented by the child class.
         Can return a dictionary e.g. {'loss': 0.1}.
         """
-        pass
+        rollout_buffer = self._sb_model.rollout_buffer
+        if not rollout_buffer.full:
+            return {}
+
+        # entropy = np.mean(self.entropy_values)
+        # self.entropy_values.clear()
+        return {}
 
     def choose_action(
             self,
             observation: np.ndarray
     ) -> Union[int, np.ndarray]:
-        return self._sb_model.predict(observation)[0] # [0]
+        action = self._sb_model.predict(observation)[0] # [0]
+        # values, log_prob, entropy = self._sb_model.policy.evaluate_actions(
+        #                torch.from_numpy(observation),
+        #                torch.from_numpy(action)
+        #            )
+        #self.entropy_values.append(entropy)
+        return action
     
     def full_buffer(self) -> bool:
-        return self.model.rollout_buffer.full
+        return self._sb_model.rollout_buffer.full
 
     def is_stable_baselines_wrapper(self) -> bool:
         """

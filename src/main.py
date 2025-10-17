@@ -76,7 +76,7 @@ def make_simulator(
         callbacks.append(
             AgentCheckpointCallback(
                 save_base=cfg.results_save_path,
-                run_id=run_idx,   # Result will be saved per run
+                run_id=cfg.mode.load_run_id if not train else run_idx,   # Result will be saved per run
                 load_on_start=cfg.mode.load_model,
                 save_on_end=cfg.mode.save_model,
             )
@@ -92,14 +92,14 @@ def make_simulator(
             )
         )
 
-    if not train:
-        calibration_cb = ValueCalibrationCallback(
-            run_id=run_idx,
-            save_path=os.path.join(cfg.results_save_path, exp_id, "calibration"),
-            # min_episodes_for_calibration=cfg.mode.eval_episodes,
-            compute_on_end=True  # Compute at end of training/eval
-        )
-        callbacks.append(calibration_cb)
+    # if not train:
+        # calibration_cb = ValueCalibrationCallback(
+        #     run_id=cfg.mode.load_run_id if not train else run_idx,
+        #     save_path=cfg.results_save_path,
+        #     # min_episodes_for_calibration=cfg.mode.eval_episodes,
+        #     compute_on_end=True  # Compute at end of training/eval
+        # )
+        # callbacks.append(calibration_cb)
 
     # callbacks.append(TimeBudgetCallback()) TODO: Make this more flexible
 
@@ -194,7 +194,9 @@ def main(cfg: DictConfig):
                 # Hardcode this for now
                 save_path = os.path.join(cfg.results_save_path, "eval")
                 tracker.set_save_path(save_path)
-                res = execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False)
+                res = execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: gym.make(cfg.environment), train=False) \
+                    if not cfg.mode.adjust_env else \
+                        execute_runs(cfg, cfg.agent.agent_type, exp_id, tracker, early_stop_cb, env_fn=lambda: make_tweaked_mujoco_env(cfg), train=False)
                 print(res)
                 # TODO: UPDATE THIS
                 # save_path = os.path.join(cfg.results_save_path, "adjusted gravity")

@@ -70,9 +70,9 @@ class SimulatorRL:
     def evaluate(self, num_eval_episodes) -> Tuple[float, float]:
         self._call_callbacks("init_callback", data=SimulatorRLData(self))
         self.agent.disable_training()
-        ret, std = self._env_interaction(num_eval_episodes)
+        ret = self._env_interaction(num_eval_episodes)
         self.agent.enable_training()
-        return ret, std
+        return ret
 
     def _train_sb3(self, num_episodes: int = 10):
         logger.info("[{self.experiment_id}] Delegating training to SB3 agent.learn")
@@ -95,6 +95,7 @@ class SimulatorRL:
         n_env = self.env_manager.n_envs
         episodes_finished = 0
         episode_returns = []  # store individual episode returns
+        entropy_values = []
 
         try:
             obs = self.env_manager.reset()
@@ -127,6 +128,10 @@ class SimulatorRL:
                 if self.agent.full_buffer():
                     self._call_callbacks("on_rollout_end")
                 learning_info = self.agent.learn()
+
+                if "entropy" in learning_info:
+                    entropy_values.append(learning_info["entropy"])
+
                 self._call_callbacks("on_learn", learning_info=learning_info)
                 obs = next_obs
 
@@ -144,11 +149,17 @@ class SimulatorRL:
         self.env_manager.close()
 
         if len(episode_returns) == 0:
-            return 0.0, 0.0
+            return {"mean_return": 0.0, "std_return": 0.0}
 
         mean_return = np.mean(episode_returns)
-        var_return = np.var(episode_returns)
-        return mean_return, var_return
+        std_return = np.std(episode_returns)
+        ret = {"mean_return": mean_return, "std_return": std_return}
+        if len(entropy_values) > 0:
+            ret["mean_entropy"] = np.mean(entropy_values)
+            ret["std_entropy"] = np.std(entropy_values)
+
+        return ret
+                
 
 
 @hydra.main(config_path="../../conf", config_name="config.yaml", version_base=None)

@@ -219,7 +219,8 @@ class MetricsTracker:
         try:
             for m in metrics:
                 try:
-                    self.plot_metric(m, f"{m}.png", smoothing_window=smoothing_window)
+                    # ".png?"
+                    self.plot_metric(m, f"{m}_{env}", smoothing_window=smoothing_window, env_id=env)
                 except Exception:
                     traceback.print_exc()
                     continue
@@ -278,6 +279,7 @@ class MetricsTracker:
                     num_episodes: int = None,
                     x_axis_label: str = "Episodes",
                     y_axis_label: str = "Metric Value",
+                    env_id: str = None,
                     title: str = None,
                     smoothing_window: int = 50,
                     ribbon: bool = True,
@@ -392,7 +394,7 @@ class MetricsTracker:
 
             # Labels, title, legend, and styling
             ax.set_title(
-                title or f'{metric_name.capitalize()} IQM with {int((1 - self.ci_alpha) * 100)}% CI',
+                title or (f'{metric_name.capitalize()} IQM with {int((1 - self.ci_alpha) * 100)}% CI' + " -" + env_id if env_id else ""),
                 fontsize=18
             )
             ax.set_xlabel(x_axis_label, fontsize=16)

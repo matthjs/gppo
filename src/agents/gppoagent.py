@@ -184,22 +184,8 @@ class GPPOAgent(OnPolicyAgent):
 
     def full_buffer(self) -> bool:
         return len(self.rollout_buffer) >= self.rollout_buffer.capacity
-
-    def learn(self) -> Dict[str, Any]:
-        """
-        Usage: run the learn() method at every timestep in the environment,
-        it will only update the agent once the rollout-buffer has been filled.
-
-        Computes advantage estimates using sampled value predictions,
-        then performs multiple gradient updates using the clipped PPO style objective
-        with DSPP log-likelihoods and KL regularization.
-
-        :return: Dictionary with loss and diagnostic statistics.
-        """
-        self.policy.train()
-        if len(self.rollout_buffer) < self.rollout_buffer.capacity:
-            return {}
-
+    
+    def compute_returns_and_advantages(self) -> None:
         # Compute last value (this is awkward can this be changed?)
         # last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device).unsqueeze(0)
         last_state = torch.tensor(self.next_state, dtype=torch.float32, device=self.device) # .unsqueeze(0)
@@ -220,6 +206,23 @@ class GPPOAgent(OnPolicyAgent):
             self.discount_factor,
             self.gae_lambda
         )
+
+    def learn(self) -> Dict[str, Any]:
+        """
+        Usage: run the learn() method at every timestep in the environment,
+        it will only update the agent once the rollout-buffer has been filled.
+
+        Computes advantage estimates using sampled value predictions,
+        then performs multiple gradient updates using the clipped PPO style objective
+        with DSPP log-likelihoods and KL regularization.
+
+        :return: Dictionary with loss and diagnostic statistics.
+        """
+        self.policy.train()
+        if len(self.rollout_buffer) < self.rollout_buffer.capacity:
+            return {}
+
+        self.compute_returns_and_advantages()
 
         # Perform update rule
         info: Dict[str, Any] = {}

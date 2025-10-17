@@ -144,6 +144,34 @@ class ValueCalibrationCallback(AbstractCallback):
                 value_std = torch.sqrt(value_dist.variance)
             
             return value_mean, value_std
+
+    """
+    def _get_value_distribution(self, obs_tensor: torch.Tensor) -> tuple:
+        self.agent.policy.eval()
+        
+        with torch.no_grad():
+            # Get value distribution from policy
+            _, value_dist = self.agent.policy(obs_tensor)
+            
+            # Extract mean and std (handles DSPP/DGP structure)
+            if hasattr(self.agent.policy, 'quad_weights'):
+                # Match choose_action behavior: sample from the mixture
+                quad_weights = self.agent.policy.quad_weights.unsqueeze(-1).exp()
+                
+                # Sample multiple times to get empirical statistics
+                n_samples = 1000  # Sufficient for stable statistics
+                samples = sample_from_gmm(quad_weights, value_dist.mean, value_dist.variance, n_samples)
+                # samples = torch.cat(samples, dim=0)
+                value_mean = samples.mean(dim=0)
+                value_std = samples.std(dim=0)
+                
+            else:
+                # Standard distribution
+                value_mean = value_dist.mean
+                value_std = torch.sqrt(value_dist.variance)
+            
+            return value_mean, value_std
+    """
     
     def on_step(self, action, reward, next_obs, done) -> bool:
         """
@@ -176,6 +204,7 @@ class ValueCalibrationCallback(AbstractCallback):
             return
         
         try:
+            self.agent.compute_returns_and_advantages()
             # Get states from buffer
             states = buffer.obs[:buffer.pos]  # [buffer_size, state_dim]
             
@@ -186,10 +215,10 @@ class ValueCalibrationCallback(AbstractCallback):
             value_means, value_stds = self._get_value_distribution(states)
             
             # Store data
-            self.collected_states.extend(states.cpu().numpy())
-            self.collected_value_means.extend(value_means.cpu().numpy())
-            self.collected_value_stds.extend(value_stds.cpu().numpy())
-            self.collected_returns.extend(gae_returns.cpu().numpy())
+            self.collected_states = states.cpu().numpy()
+            self.collected_value_means = value_means.cpu().numpy()
+            self.collected_value_stds = value_stds.cpu().numpy()
+            self.collected_returns = gae_returns.cpu().numpy()
             
             logger.debug(f"Collected {buffer.pos} samples from rollout buffer")
             
@@ -245,7 +274,7 @@ class ValueCalibrationCallback(AbstractCallback):
         
         plt.xlabel('Nominal Confidence Level (α)', fontsize=12)
         plt.ylabel('Empirical Coverage', fontsize=12)
-        plt.title(f'Value Function Calibration (Run {self.run_id})\nCE = {ce_reg:.4f}', 
+        plt.title(f'Value Function Calibration\nCE = {ce_reg:.4f}', 
                   fontsize=14)
         plt.legend(fontsize=11)
         plt.grid(True, alpha=0.3)
@@ -257,86 +286,103 @@ class ValueCalibrationCallback(AbstractCallback):
         plt.close()
         
         logger.info(f"Saved calibration plot to {save_path}")
-    
+        
     def compute_and_plot_calibration(self) -> Optional[Dict]:
         """
         Compute calibration metrics and create plot.
-        
+
         Returns:
-            Dictionary with calibration results, or None if insufficient data
+            Dictionary with calibration results, or None if insufficient data.
         """
         n_samples = len(self.collected_returns)
-        
+
         if n_samples == 0:
             logger.warning("No samples collected - cannot compute calibration")
             return None
-        
+
         if n_samples < self.min_samples:
             logger.warning(f"Only {n_samples} samples collected (min: {self.min_samples}) - calibration may be unreliable")
-        
+
         logger.info(f"Computing calibration from {n_samples} state-value pairs...")
-        
+
         # Compute calibration
         alphas, coverages, ce_reg = self._compute_coverage_curve()
-        
+
         # Statistics
         value_means = np.array(self.collected_value_means)
         value_stds = np.array(self.collected_value_stds)
         returns = np.array(self.collected_returns)
-        
-        # Prediction error statistics
+
         errors = returns - value_means
         mae = np.abs(errors).mean()
         rmse = np.sqrt((errors ** 2).mean())
-        
+
         logger.info(f"Calibration Error (CE_reg): {ce_reg:.4f}")
-        logger.info(f"Mean predicted value: {value_means.mean():.3f} ± {value_means.std():.3f}")
-        logger.info(f"Mean GAE return: {returns.mean():.3f} ± {returns.std():.3f}")
-        logger.info(f"Mean predicted std: {value_stds.mean():.3f}")
         logger.info(f"MAE: {mae:.3f}, RMSE: {rmse:.3f}")
-        
-        # Create plot
-        os.makedirs(self.save_path, exist_ok=True)
-        plot_path = os.path.join(
-            self.save_path, 
-            f"{self.agent_id}_calibration_run{self.run_id}.png"
+
+        # === Corrected directory structure ===
+        calib_dir = os.path.join(
+            self.save_path,
+            self.experiment_id,
+            self.env_id,
+            self.agent_id,
+            "calibration"
         )
+        os.makedirs(calib_dir, exist_ok=True)
+
+        plot_path = os.path.join(calib_dir, f"calibration_run{self.run_id}_{self.env_id}.png")
+        json_path = os.path.join(calib_dir, f"calibration_run{self.run_id}_{self.env_id}.json")
+
+        # Save plot and metrics
         self._plot_calibration(alphas, coverages, ce_reg, plot_path)
-        
+        with open(json_path, 'w') as f:
+            json.dump({
+                'ce_reg': float(ce_reg),
+                'n_samples': n_samples,
+                'mean_predicted_value': float(value_means.mean()),
+                'std_predicted_value': float(value_means.std()),
+                'mean_gae_return': float(returns.mean()),
+                'std_gae_return': float(returns.std()),
+                'mean_predicted_std': float(value_stds.mean()),
+                'mae': float(mae),
+                'rmse': float(rmse),
+                'alphas': alphas.tolist(),
+                'coverages': coverages.tolist()
+            }, f, indent=2)
+
+        logger.info(f"Saved calibration plot to {plot_path}")
+        logger.info(f"Saved calibration results to {json_path}")
+
         return {
             'ce_reg': float(ce_reg),
             'n_samples': n_samples,
-            'mean_predicted_value': float(value_means.mean()),
-            'std_predicted_value': float(value_means.std()),
-            'mean_gae_return': float(returns.mean()),
-            'std_gae_return': float(returns.std()),
-            'mean_predicted_std': float(value_stds.mean()),
             'mae': float(mae),
             'rmse': float(rmse),
             'alphas': alphas.tolist(),
             'coverages': coverages.tolist()
         }
-    
+
+
     def on_training_end(self) -> None:
-        """
-        Called at the end of training/evaluation.
-        
-        Computes and saves calibration plot if enabled.
-        """
+        """Called at the end of training/evaluation."""
         super().on_training_end()
-        
+
         if not self.compute_on_end:
             return
-        
-        # Compute calibration
+
         results = self.compute_and_plot_calibration()
-        
+
         if results:
-            # Save numerical results
-            json_path = os.path.join(
+            calib_dir = os.path.join(
                 self.save_path,
-                f"{self.agent_id}_calibration_run{self.run_id}.json"
+                self.experiment_id,
+                self.env_id,
+                self.agent_id,
+                "calibration"
             )
+            os.makedirs(calib_dir, exist_ok=True)
+            json_path = os.path.join(calib_dir, f"calibration_run{self.run_id}.json")
+
             with open(json_path, 'w') as f:
                 json.dump(results, f, indent=2)
             logger.info(f"Saved calibration results to {json_path}")
