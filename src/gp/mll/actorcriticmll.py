@@ -90,9 +90,10 @@ class ActorCriticMLL:
         ).mean()
 
         # entropy_loss is NEGATIVE entropy
-        entropy_loss = -torch.mean(-self.mll_policy.last_log_prob)    # Need to use approximate entropy
+        log_prob = self.mll_policy.last_log_prob
+        entropy_loss = -torch.mean(-log_prob)    # Need to use approximate entropy
 
         # Total loss: policy + value - entropy_bonus
         loss = policy_loss + self.vf_coef * value_loss + self.ent_coef * entropy_loss
 
-        return loss, policy_loss, value_loss, -entropy_loss
+        return loss, policy_loss, value_loss, -entropy_loss, log_prob

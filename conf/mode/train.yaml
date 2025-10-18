@@ -1,7 +1,7 @@
 name: train
 
-execute: False
-load_model: True
+execute: True
+load_model: False
 save_model: True
 model_path: "../models"   # e.g., /models/gppo/file.pth
 import_metrics: True

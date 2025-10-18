@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 from src.gp.actorcriticdgp import ActorCriticDGP
 from src.gp.deepsigma import sample_from_gmm
 from src.gp.mll.actorcriticmll import ActorCriticMLL
@@ -7,6 +7,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from typing import Dict, Any, List
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 
 class GPPOAgent(OnPolicyAgent):
@@ -41,6 +45,7 @@ class GPPOAgent(OnPolicyAgent):
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
             sample_vf: bool = True,
+            target_kl: Optional[float] = 0.01,
             device: torch.device = torch.device("cpu"),
             **kwargs
     ):
@@ -98,6 +103,7 @@ class GPPOAgent(OnPolicyAgent):
         self.vf_coef = vf_coef
         self.max_grad_norm = max_grad_norm
         self.sample_vf = sample_vf
+        self.target_kl = target_kl
 
         self.objective = ActorCriticMLL(self.policy,
                                         self.policy.policy_likelihood,
@@ -207,6 +213,20 @@ class GPPOAgent(OnPolicyAgent):
             self.gae_lambda
         )
 
+    def _kl_early_stop(self, approx_kl_divs: list, log_probs, old_log_probs, epoch) -> bool:
+        """
+        Use reverse KL divergence for early stopping as used in the SB3 implementation of PPO
+        (https://github.com/DLR-RM/stable-baselines3/blob/master/stable_baselines3/ppo/ppo.py)
+        """
+        with torch.no_grad():
+            log_ratio = log_probs - old_log_probs
+            approx_kl_div = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
+            approx_kl_divs.append(approx_kl_div)
+        if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
+            logger.warning(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
+            return True
+        return False
+
     def learn(self) -> Dict[str, Any]:
         """
         Usage: run the learn() method at every timestep in the environment,
@@ -231,19 +251,27 @@ class GPPOAgent(OnPolicyAgent):
         info["policy_loss"] = 0.0
         info["entropy"] = 0.0
         cnt = 0
-        for _ in range(self.n_epochs):
+        continue_training = True
+        for epoch in range(self.n_epochs):
+            approx_kl_divs = []
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
                 cnt += 1
-                loss, policy_loss, value_loss, entropy = self.objective(states, actions, advantages, returns, old_log_probs)
+                loss, policy_loss, value_loss, entropy, log_probs = self.objective(states, actions, advantages, returns, old_log_probs)
                 losses.append(loss.item())
                 info["value_loss"] += value_loss.item()
                 info["policy_loss"] += policy_loss.item()
                 info["entropy"] += entropy.item()
                 if self.training:
+                    if self._kl_early_stop(approx_kl_divs, log_probs, old_log_probs, epoch):
+                        continue_training = False
+                        break
                     self.optimizer.zero_grad()
                     loss.backward()
                     nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                     self.optimizer.step()
+
+            if not continue_training:
+                break
 
         self.rollout_buffer.clear()
         info["loss"] = float(np.mean(losses))

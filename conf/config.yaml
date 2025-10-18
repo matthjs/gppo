@@ -1,12 +1,12 @@
 defaults:
-  - mode: eval # Set a default mode value, it can be overridden by command-line args
-  - agent: sb_ppo_Walker2d-v5
+  - mode: train # Set a default mode value, it can be overridden by command-line args
+  - agent: gppo_Walker2d-v5
   - _self_
 
-exp_id:  "mujoco_experiment_eurips"  # "mujoco_experiment_eurips"  # "test!" # "hyperparam_tuning_mujoco5"  # "mujoco_experiment" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
+exp_id:  "mujoco_experiment_eurips_long2"  # "mujoco_experiment_eurips"  # "test!" # "hyperparam_tuning_mujoco5"  # "mujoco_experiment" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
 
 # Common hyperparameters (can be overridden)
-num_episodes: 15000
+num_episodes: 100000
 num_bootstrap_samples: 100
 num_runs: 1
 n_envs: 8
@@ -26,7 +26,7 @@ early_stopping:
 wandb:
   project: "gppo-drl"
   entity: "ml_exp"
-  use_wandb: False
+  use_wandb: True
 
 # Hydra plugin settings
 # hydra:
