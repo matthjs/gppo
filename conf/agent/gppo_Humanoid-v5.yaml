@@ -16,6 +16,7 @@ agent_params:
     num_quad_sites: 8
     beta: 0.5
     sample_vf: True
+    target_kl: null
     hidden_layers_config:
         - output_dims: 17
           mean_type: "linear"
