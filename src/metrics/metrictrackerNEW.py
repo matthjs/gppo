@@ -102,6 +102,34 @@ class MetricsTracker:
             }
             self._per_run_values[rid].append(row)
 
+    def get_final_metrics(self, metric_name: str) -> dict:
+        """Returns final episode's IQM and CI for all agents in a dictionary."""
+        final_metrics = {}
+        with self._lock:
+            if metric_name not in self._metrics_history:
+                raise ValueError(f"Metric '{metric_name}' not found")
+
+            for agent_id, episodes in self._metrics_history[metric_name].items():
+                sorted_eps = sorted(episodes.items())
+                if not sorted_eps:  # No episodes recorded
+                    continue
+
+                # Get last episode data
+                last_ep = sorted_eps[-1][0]
+                last_ep = 10000
+                iqm, lower, upper = self.get_iqm_ci(metric_name, agent_id, last_ep)
+
+                # Shorten agent name for display
+                display_name = agent_id.replace("Agent", "") if agent_id.endswith("Agent") else agent_id
+                final_metrics[display_name] = {
+                    'episode': last_ep,
+                    'iqm': iqm,
+                    'lower_ci': lower,
+                    'upper_ci': upper
+                }
+
+        return final_metrics
+
     # ------------------- CSV save/load per run & directory helpers -------------------
     def save_run_csv(self,
                     root_dir: str,
@@ -394,7 +422,7 @@ class MetricsTracker:
 
             # Labels, title, legend, and styling
             ax.set_title(
-                title or (f'{metric_name.capitalize()} IQM with {int((1 - self.ci_alpha) * 100)}% CI' + " -" + env_id if env_id else ""),
+                title or (f'{metric_name.capitalize()} IQM with {int((1 - self.ci_alpha) * 100)}% CI' + " [" + env_id + "]" if env_id else ""),
                 fontsize=18
             )
             ax.set_xlabel(x_axis_label, fontsize=16)

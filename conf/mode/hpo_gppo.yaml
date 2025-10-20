@@ -24,7 +24,7 @@ hpo:
       value_type: int
     - name: num_episodes
       type: fixed
-      value: 10000
+      value: 15000
       value_type: int
     - name: beta
       type: fixed

@@ -170,7 +170,6 @@ def main(cfg: DictConfig):
         tracker = MetricsTracker(n_bootstrap=cfg.num_bootstrap_samples)
         if cfg.mode.import_metrics:
             for agent_name in cfg.mode.agents:
-                # Dynamically import from src.agents
                 try:
                     tracker.load_results_from_dir(metrics_path, agent_name, cfg.environment)
                 except FileNotFoundError:
@@ -189,6 +188,16 @@ def main(cfg: DictConfig):
             else:
                 print("No training, running metric tracker plotting method...")
                 tracker.save_env_aggregated_plots(metrics_path, cfg.environment)
+                final_stats = tracker.get_final_metrics("return")
+                for agent, stats in final_stats.items():
+                    print(f"{agent} return:")
+                    print(f"  Final Episode: {stats['episode']}")
+                    print(f"  IQM: {stats['iqm']:.2f} (95% CI: {stats['lower_ci']:.2f}-{stats['upper_ci']:.2f})\n")
+                final_stats = tracker.get_final_metrics("entropy")
+                for agent, stats in final_stats.items():
+                    print(f"{agent} entropy:")
+                    print(f"  Final Episode: {stats['episode']}")
+                    print(f"  IQM: {stats['iqm']:.2f} (95% CI: {stats['lower_ci']:.2f}-{stats['upper_ci']:.2f})\n")
         elif cfg.mode.name == "eval":
             if cfg.mode.execute:
                 # Hardcode this for now

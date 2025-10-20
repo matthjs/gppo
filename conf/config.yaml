@@ -1,27 +1,27 @@
 defaults:
   - mode: train # Set a default mode value, it can be overridden by command-line args
-  - agent: gppo_Walker2d-v5
+  - agent: gppo_Humanoid-v5
   - _self_
 
-exp_id:  "mujoco_experiment_eurips_long2"  # "mujoco_experiment_eurips"  # "test!" # "hyperparam_tuning_mujoco5"  # "mujoco_experiment" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
+exp_id: mujoco_experiment_eurips #hyperparam_tuning_mujoco6" # mujoco_experiment_eurips_long2"  # "mujoco_experiment_eurips"  # "test!" # "hyperparam_tuning_mujoco5"  # "mujoco_experiment" # "the_mujoco_experiment" # "hyperparam_tuning_mujoco5"
 
 # Common hyperparameters (can be overridden)
-num_episodes: 100000
+num_episodes: 15000
 num_bootstrap_samples: 100
 num_runs: 1
 n_envs: 8
 results_save_path: "./results/"
-environment: "Walker2d-v5" # "Humanoid-v5"  # "Walker2d-v5"   # "Humanoid-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
+environment: "Humanoid-v5" # "Humanoid-v5" # Walker2d-v5" # "Humanoid-v5"  # "Walker2d-v5"   # "Humanoid-v5" # "Swimmer-v5"  # "HumanoidStandup-v5" # "Humanoid-v5" # "HalfCheetah-v5"   # "Ant-v5"  # Walker2d-v5"  #Walker2d-v5"   # "InvertedPendulum-v5"   Walker2d-v5
 
 normalize_obs: True
 normalize_act: False   # Rescale to [-1,1]
 clip_obs: 10.0 #1.0   #
 
 early_stopping:
-  enable: False
+  enable: True
   early_stop_check: 3000
   early_stop_window: 50
-  early_stop_threshold: 200
+  early_stop_threshold: 50
 
 wandb:
   project: "gppo-drl"
