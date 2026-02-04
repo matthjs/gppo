@@ -2,7 +2,7 @@ import logging
 import pathlib
 import wandb
 import numpy as np
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from gppo.simulation.callbacks.abstractcallback import AbstractCallback
 from gppo.simulation.simulatorldata import SimulatorRLData
 
@@ -11,12 +11,13 @@ logger = logging.getLogger(__name__)
 
 class WandbStepCallback(AbstractCallback):
     """
-    Standalone WandB callback that logs step-level metrics without MetricTrackerCallback.
+    Standalone WandB callback with evaluation support.
     
     Features:
     - Logs average step reward (handles parallel environments)
     - Tracks episode returns for each environment separately
     - Logs episode-level metrics when episodes complete
+    - Supports periodic evaluation on separate eval environment
     - Supports WandB groups for organizing runs
     - Optional step-level logging frequency to avoid flooding WandB
     """
@@ -34,6 +35,12 @@ class WandbStepCallback(AbstractCallback):
         log_step_frequency: int = 1,  # Log every N steps (1 = every step)
         log_step_rewards: bool = True,  # Whether to log step rewards
         log_episode_returns: bool = True,  # Whether to log episode returns
+        
+        # Evaluation parameters
+        eval_env_manager: Optional[Any] = None,  # EnvManager for evaluation
+        eval_frequency: int = 0,  # Evaluate every N episodes (0 = no evaluation)
+        eval_episodes: int = 5,  # Number of episodes per evaluation
+        eval_prefix: str = "eval/",  # Prefix for eval metrics in wandb
     ):
         super().__init__()
         self.project = project
@@ -47,6 +54,13 @@ class WandbStepCallback(AbstractCallback):
         self.log_step_rewards = log_step_rewards
         self.log_episode_returns = log_episode_returns
         
+        # Evaluation settings
+        self.eval_env_manager = eval_env_manager
+        self.eval_frequency = eval_frequency
+        self.eval_episodes = eval_episodes
+        self.eval_prefix = eval_prefix
+        self.do_evaluation = eval_env_manager is not None and eval_frequency > 0
+        
         # Internal state tracking
         self.n_env = None
         self.episode_returns = None  # Ongoing returns for each env
@@ -59,6 +73,13 @@ class WandbStepCallback(AbstractCallback):
         self.step_rewards_history = []
         self.avg_step_reward_window = 1000  # Window for moving average
         
+        # Evaluation tracking
+        self.eval_returns_history = []  # List of eval returns over time
+        self.eval_episodes_history = []  # Corresponding episode numbers
+        self.last_eval_episode = 0
+        
+        # Agent reference for evaluation
+        self.agent = None
         self.run = None
         logger.setLevel(verbose)
 
@@ -71,6 +92,9 @@ class WandbStepCallback(AbstractCallback):
         # Get number of parallel environments from simulator
         self.n_env = data.n_env
         self.episode_returns = np.zeros(self.n_env, dtype=np.float32)
+        
+        # Store agent reference for evaluation
+        self.agent = data.agent
         
         # Initialize WandB run with group
         self.run = wandb.init(
@@ -87,6 +111,12 @@ class WandbStepCallback(AbstractCallback):
             f"WandbStepCallback initialized with {self.n_env} environments "
             f"(project={self.project}, group={self.group}, run={self.run_name})"
         )
+        
+        if self.do_evaluation:
+            logger.info(
+                f"Evaluation enabled: every {self.eval_frequency} episodes, "
+                f"{self.eval_episodes} episodes per evaluation"
+            )
 
     def on_step(self, action, reward, next_obs, done) -> bool:
         """
@@ -178,8 +208,96 @@ class WandbStepCallback(AbstractCallback):
             f"with return {episode_return:.2f}"
         )
         
+        # Check if we should run evaluation
+        if (self.do_evaluation and 
+            self.episodes_finished - self.last_eval_episode >= self.eval_frequency):
+            self._run_evaluation()
+            self.last_eval_episode = self.episodes_finished
+        
         # Reset this environment's return tracker
         self.episode_returns[env_idx] = 0.0
+
+    def _run_evaluation(self):
+        """
+        Run evaluation on the separate evaluation environment.
+        """
+        if not self.agent or not self.eval_env_manager:
+            return
+        
+        logger.info(f"Running evaluation after episode {self.episodes_finished}")
+        
+        # Temporarily disable training for evaluation
+        was_training = self.agent.training_enabled
+        self.agent.disable_training()
+        
+        eval_returns = []
+        eval_lengths = []
+        
+        try:
+            for ep_idx in range(self.eval_episodes):
+                obs = self.eval_env_manager.reset()
+                done = False
+                episode_return = 0.0
+                episode_length = 0
+                
+                while not done:
+                    # Get action from agent (no exploration during eval)
+                    action = self.agent.choose_action(obs, deterministic=True)
+                    
+                    # Step the environment
+                    obs, reward, done, info = self.eval_env_manager.step(action)
+                    
+                    episode_return += reward
+                    episode_length += 1
+                
+                eval_returns.append(episode_return)
+                eval_lengths.append(episode_length)
+                
+                logger.debug(
+                    f"Eval episode {ep_idx + 1}/{self.eval_episodes}: "
+                    f"return={episode_return:.2f}, length={episode_length}"
+                )
+        
+        except Exception as e:
+            logger.error(f"Error during evaluation: {e}")
+            eval_returns = []
+        
+        finally:
+            # Restore training state
+            if was_training:
+                self.agent.enable_training()
+        
+        # Log evaluation results if we have any
+        if eval_returns:
+            mean_return = np.mean(eval_returns)
+            std_return = np.std(eval_returns)
+            mean_length = np.mean(eval_lengths)
+            
+            # Store for history
+            self.eval_returns_history.append(mean_return)
+            self.eval_episodes_history.append(self.episodes_finished)
+            
+            # Log to wandb
+            eval_metrics = {
+                f"{self.eval_prefix}episode": self.episodes_finished,
+                f"{self.eval_prefix}mean_return": mean_return,
+                f"{self.eval_prefix}std_return": std_return,
+                f"{self.eval_prefix}min_return": np.min(eval_returns),
+                f"{self.eval_prefix}max_return": np.max(eval_returns),
+                f"{self.eval_prefix}mean_length": mean_length,
+                f"{self.eval_prefix}timestep": self.total_timesteps,
+            }
+            
+            # Add individual episode returns
+            for i, ret in enumerate(eval_returns[:5]):  # Limit to first 5
+                eval_metrics[f"{self.eval_prefix}ep_{i}_return"] = ret
+            
+            wandb.log(eval_metrics)
+            
+            logger.info(
+                f"Evaluation complete: {self.eval_episodes} episodes, "
+                f"mean return = {mean_return:.2f} ± {std_return:.2f}"
+            )
 
     def on_learn(self, learning_info: Dict[str, Any]):
         """
@@ -195,11 +313,9 @@ class WandbStepCallback(AbstractCallback):
 
     def on_rollout_start(self):
         super().on_rollout_start()
-        # Could log rollout start metrics if needed
 
     def on_rollout_end(self):
         super().on_rollout_end()
-        # Could log rollout statistics if needed
 
     def on_episode_end(self):
         super().on_episode_end()
@@ -230,6 +346,11 @@ class WandbStepCallback(AbstractCallback):
         """
         super().on_training_end()
         
+        # Run final evaluation if enabled
+        if self.do_evaluation and self.episodes_finished > self.last_eval_episode:
+            logger.info("Running final evaluation...")
+            self._run_evaluation()
+        
         # Log final statistics
         if self.completed_returns:
             final_stats = {
@@ -241,13 +362,21 @@ class WandbStepCallback(AbstractCallback):
                 "final/total_timesteps": self.total_timesteps,
                 "final/avg_step_reward": np.mean(self.step_rewards_history) if self.step_rewards_history else 0,
             }
+            
+            # Add evaluation statistics if available
+            if self.eval_returns_history:
+                final_stats["final/eval_best_return"] = np.max(self.eval_returns_history)
+                final_stats["final/eval_avg_return"] = np.mean(self.eval_returns_history)
+                final_stats["final/eval_std_return"] = np.std(self.eval_returns_history)
+            
             wandb.log(final_stats)
         
         # Log any plots
         self._log_plots()
         
-        # Optional: Create and log a summary CSV
+        # Create and log summary CSVs
         self._log_summary_csv()
+        self._log_eval_summary_csv()
         
         # Finish WandB run
         wandb.finish()
@@ -255,7 +384,7 @@ class WandbStepCallback(AbstractCallback):
 
     def _log_summary_csv(self):
         """
-        Create and log a summary CSV of episode returns.
+        Create and log a summary CSV of training episode returns.
         """
         if not self.completed_returns:
             return
@@ -275,19 +404,53 @@ class WandbStepCallback(AbstractCallback):
         # Save to temporary file and log as artifact
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             df.to_csv(f.name, index=False)
-            artifact = wandb.Artifact(f"{self.run_name}_summary", type="metrics")
-            artifact.add_file(f.name, name="episode_summary.csv")
+            artifact = wandb.Artifact(f"{self.run_name}_training_summary", type="metrics")
+            artifact.add_file(f.name, name="training_episode_summary.csv")
             self.run.log_artifact(artifact)
         
-        logger.debug("Logged episode summary CSV to WandB artifacts")
+        logger.debug("Logged training episode summary CSV to WandB artifacts")
+
+    def _log_eval_summary_csv(self):
+        """
+        Create and log a summary CSV of evaluation results.
+        """
+        if not self.eval_returns_history:
+            return
+        
+        import pandas as pd
+        import tempfile
+        
+        # Create evaluation summary DataFrame
+        eval_data = {
+            "training_episode": self.eval_episodes_history,
+            "eval_mean_return": self.eval_returns_history,
+        }
+        
+        df = pd.DataFrame(eval_data)
+        
+        # Save to temporary file and log as artifact
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+            df.to_csv(f.name, index=False)
+            artifact = wandb.Artifact(f"{self.run_name}_eval_summary", type="metrics")
+            artifact.add_file(f.name, name="evaluation_summary.csv")
+            self.run.log_artifact(artifact)
+        
+        logger.debug("Logged evaluation summary CSV to WandB artifacts")
 
     def get_stats(self) -> Dict[str, Any]:
         """
         Get current statistics for external use.
         """
-        return {
+        stats = {
             "total_timesteps": self.total_timesteps,
             "episodes_finished": self.episodes_finished,
             "avg_episode_return": np.mean(self.completed_returns) if self.completed_returns else 0,
             "ongoing_returns": self.episode_returns.tolist() if self.episode_returns is not None else [],
         }
+        
+        if self.eval_returns_history:
+            stats["eval_returns_history"] = self.eval_returns_history
+            stats["eval_best_return"] = np.max(self.eval_returns_history)
+            stats["eval_episodes_history"] = self.eval_episodes_history
+        
+        return stats
