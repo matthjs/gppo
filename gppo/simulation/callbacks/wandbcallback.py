@@ -1,0 +1,143 @@
+import logging
+import pathlib
+import wandb
+from gppo.simulation.callbacks.abstractcallback import AbstractCallback
+from gppo.simulation.simulatorldata import SimulatorRLData
+from gppo.simulation.callbacks.metrictrackercallback import MetricTrackerCallback
+
+logger = logging.getLogger(__name__)
+
+
+class WandbCallback(AbstractCallback):
+    """
+    Wraps a MetricTrackerCallback and logs its metrics to Weights & Biases (wandb).
+
+    - Delegates all metric tracking to MetricTrackerCallback.
+    - Logs episode-level metrics by default.
+    - Step-level logging optional if the wrapped callback exposes step metrics.
+    """
+
+    def __init__(
+        self,
+        metric_callback: MetricTrackerCallback,
+        project: str,
+        entity: str = None,
+        config: dict = None,
+        run_name: str = None,
+        verbose: int = logging.INFO,
+        plot_dir: str = None
+    ):
+        super().__init__()
+        self.metric_callback = metric_callback
+        self.project = project
+        self.run_name = run_name
+        self.entity = entity
+        self.config = config or {}
+        self.plot_dir = pathlib.Path(plot_dir) if plot_dir else None
+        self.run = None
+
+        logger.setLevel(verbose)
+
+    def init_callback(self, data: SimulatorRLData):
+        """
+        Initialize both the MetricTrackerCallback and a wandb run.
+        """
+        super().init_callback(data)
+        self.metric_callback.init_callback(data)
+
+        self.run = wandb.init(
+            project=self.project,
+            entity=self.entity,
+            name=self.run_name,
+            config=self.config,
+            reinit=True,  # allow multiple runs in the same process
+        )
+
+        logger.info(f"WandbCallback initialized (project={self.project}, run={self.run_name})")
+
+    def on_step(self, action, reward, next_obs, done) -> bool:
+        """
+        Forward step to MetricTrackerCallback and optionally log step metrics.
+        """
+        super().on_step(action, reward, next_obs, done)
+
+        # Delegate metric tracking
+        continue_training = self.metric_callback.on_step(action, reward, next_obs, done)
+
+        # step-level logging
+        if hasattr(self.metric_callback, "episode_returns"):
+            for i in range(self.metric_callback.n_env):
+                wandb.log({f"return": self.metric_callback.episode_returns[i]})
+
+        return continue_training
+    
+    def _log_plots(self):
+        """
+        Log all .png/.svg files from the plot directory to wandb and save them as artifacts.
+        """
+        if not self.plot_dir or not self.plot_dir.exists():
+            return
+
+        artifact = wandb.Artifact(f"{self.run_name}_plots", type="plots")
+        for ext in ("*.png", "*.svg"):
+            for file in self.plot_dir.glob(ext):
+                wandb.log({f"plots/{file.name}": wandb.Image(str(file))})
+                artifact.add_file(str(file))
+                logger.debug(f"Logged plot {file}")
+        self.run.log_artifact(artifact)
+
+    def on_episode_end(self):
+        super().on_episode_end()
+        self.metric_callback.on_episode_end()
+
+        # Log episode-level metrics
+        if len(self.metric_callback.completed_returns) > 0:
+            last_return = self.metric_callback.completed_returns[-1]
+            wandb.log({
+                "episode": self.metric_callback.episodes_finished,
+                "return": last_return,
+            })
+            logger.debug(
+                f"WandbCallback logged episode {self.metric_callback.episodes_finished}, return={last_return:.2f}"
+            )
+        
+        # Log plots at the end of each episode
+        self._log_plots()
+
+    def on_rollout_start(self):
+        super().on_rollout_start()
+        self.metric_callback.on_rollout_start()
+
+    def on_learn(self, learning_info):
+        """
+        Log learning info metrics from the agent to wandb.
+        """
+        # Forward to MetricTrackerCallback
+        self.metric_callback.on_learn(learning_info)
+
+        if learning_info:
+            wandb.log(learning_info)
+
+    def on_training_end(self):
+        super().on_training_end()
+        self.metric_callback.on_training_end()
+
+        # Final log of plots
+        self._log_plots()
+
+        # Add all CSVs in the experiment folder
+        artifact = wandb.Artifact(f"{self.run_name}_metrics", type="metrics")
+        save_root = self.metric_callback.save_path
+        experiment_id = getattr(self.metric_callback, "experiment_id", "default_experiment")
+        env_id = getattr(self.metric_callback, "env_id", "default_env")
+        experiment_path = pathlib.Path(save_root) / experiment_id / env_id
+
+        for csv_file in experiment_path.rglob("*.csv"):
+            # Preserve folder structure inside the artifact
+            rel_path = csv_file.relative_to(experiment_path)
+            artifact.add_file(str(csv_file), name=str(rel_path))
+
+        self.run.log_artifact(artifact)
+
+        wandb.finish()
+        logger.info("WandbCallback training ended and run closed.")
