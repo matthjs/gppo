@@ -2,7 +2,7 @@ import wandb
 import os
 from typing import Optional, Dict, Any
 from datetime import datetime
-from src.metrics.metrictracker import MetricsTracker
+from gppo.metrics.metrictracker import MetricsTracker
 
 
 class WandbLogger:
