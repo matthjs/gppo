@@ -143,7 +143,7 @@ class WandbStepCallback(AbstractCallback):
         while self.eval_running:
             try:
                 # Get actions from agent (deterministic for evaluation)
-                eval_actions = self.agent.choose_action(eval_obs, deterministic=True)
+                eval_actions = self.agent.choose_action(eval_obs) # , deterministic=True)
                 
                 # Step the evaluation environment
                 next_eval_obs, eval_rewards, eval_dones, eval_infos = self.eval_env_manager.step(eval_actions)
