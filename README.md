@@ -12,31 +12,24 @@ This work introduces a new scalable model-free actor-critic based algorithm base
 ## Getting started
 
 ### Prerequisites
-- [Poetry](https://python-poetry.org/).
+- [UV package manager](https://docs.astral.sh/uv/getting-started/installation/).
 ## Running
-This project uses  [Poetry](https://python-poetry.org/) for dependency management.
-You can also set up a virtual environment using Poetry. Poetry can  be installed using `pip`:
-```
-pip install poetry
-```
-Then initiate the virtual environment with the required dependencies (see `poetry.lock`, `pyproject.toml`):
-```
-poetry config virtualenvs.in-project true    # ensures virtual environment is in project
-poetry install
-```
-The virtual environment can be accessed from the shell using:
-```
-poetry shell
-```
-IDEs like Pycharm will be able to detect the interpreter of this virtual environment.
 
-Alternatively generate a requirements.txt:
+After cloning the repository make sure you have the [UV package manager](https://docs.astral.sh/uv/getting-started/installation/):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.bashrc
+uv --version
 ```
-poetry export -f requirements.txt --without-hashes > requirements.txt
+Install dependencies:
+```bash
+uv sync
 ```
-and
-```
-python3 -m pip install -r requirements.txt
+Then access virtual environment with `source .venv/bin/activate`.
+
+To add more libraries, you can use:
+```bash
+uv add <package_name>
 ```
 
 ## Running the code
