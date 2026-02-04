@@ -16,6 +16,7 @@ class WandbLogger:
             entity: Optional[str] = None,
             config: Optional[Dict[str, Any]] = None,
             name: Optional[str] = None,
+            group: Optional[str] = None,
             metrics_tracker: Optional[MetricsTracker] = None
     ) -> None:
         """
@@ -29,6 +30,7 @@ class WandbLogger:
         :param entity: W&B entity (user or team).
         :param config: Optional run configuration dictionary.
         :param name: Optional name of the run.
+        :param group: Group of the run.
         :param metrics_tracker: Optional MetricsTracker instance for keeping track of metrics across runs.
         """
         self.enabled = enable
@@ -36,6 +38,7 @@ class WandbLogger:
         self.entity = entity
         self.config = config
         self.name = name
+        self.group = group
         self.metrics_tracker = metrics_tracker
         self.run = None
         self.runs = 0
@@ -53,7 +56,8 @@ class WandbLogger:
                 project=self.project,
                 entity=self.entity,
                 config=self.config,
-                name=self.name + "-" + formatted_time
+                name=self.name + "-" + formatted_time,
+                group=self.group
             )
         self.runs += 1
 
