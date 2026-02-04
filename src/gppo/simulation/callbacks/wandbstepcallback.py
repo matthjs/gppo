@@ -69,7 +69,7 @@ class WandbStepCallback(AbstractCallback):
         super().init_callback(data)
         
         # Get number of parallel environments from simulator
-        self.n_env = data.simulator.n_env
+        self.n_env = data.n_env
         self.episode_returns = np.zeros(self.n_env, dtype=np.float32)
         
         # Initialize WandB run with group
