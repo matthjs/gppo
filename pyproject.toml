@@ -5,6 +5,11 @@ description = ""
 authors = ["Matthijs <matthijs.vanderlende@gmail.com>"]
 readme = "README.md"
 
+[project]
+name = "gppo"
+version = "0.1.0"
+requires-python = ">=3.10"
+
 [tool.poetry.dependencies]
 python = "^3.10"
 gymnasium = {extras = ["all"], version = "^1.1.1"}
