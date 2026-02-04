@@ -5,7 +5,6 @@ with slight adjustments to ensure compatibility with RL Agents.
 import json
 import os
 from typing import Callable, Tuple, List, Union
-from ax import Experiment
 from ax.service.ax_client import AxClient
 import torch
 from typing import Dict, Any, Optional
@@ -129,7 +128,7 @@ class BayesianOptimizer:
         return self.ax_client.get_best_parameters()[0]
 
     @property
-    def experiment(self) -> Experiment:
+    def experiment(self):
         """Access underlying Ax experiment object."""
         return self.ax_client.experiment
 
