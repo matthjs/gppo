@@ -145,7 +145,7 @@ def make_tweaked_mujoco_env(cfg):
     base_env.model.opt.gravity[:] = np.array([0.0, 0.0, -1.62])
     return env
 
-@hydra.main(config_path="../conf", config_name="config.yaml", version_base=None)
+@hydra.main(config_path="../../conf", config_name="config.yaml", version_base=None)
 def main(cfg: DictConfig):
     """
     Entrypoint of program. See hydra configs.
