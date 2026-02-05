@@ -237,9 +237,10 @@ class WandbStepCallback(AbstractCallback):
             "train_min_step_reward": min_reward,
             "train_std_step_reward": std_reward,
             "train_episodes_finished": self.train_episodes_finished,
+            "train_avg_ongoing_return": np.mean(self.train_episode_returns),
         }
         
-        for i in range(min(self.n_env, 5)):
+        for i in range(self.n_env):
             step_metrics[f"train_env_{i}_ongoing_return"] = self.train_episode_returns[i]
         
         wandb.log(step_metrics)
