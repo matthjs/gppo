@@ -32,7 +32,8 @@ class SimulatorRL:
         agent_id: str,
         env_manager: EnvManager,
         agent: Agent,
-        num_episodes: int,
+        num_episodes: Optional[int] = None,
+        num_timesteps: Optional[int] = None,
         callbacks: Optional[List[AbstractCallback]] = None,
         save_model: bool = False,
         load_model: bool = False,
@@ -46,9 +47,17 @@ class SimulatorRL:
         self.callbacks = callbacks or []
         self.save_model = save_model
         self.load_model = load_model
-        self.num_episodes = num_episodes
-        self.env_id = env_manager.env_id
         self.device = device
+        
+        # Validate inputs
+        if num_episodes is None and num_timesteps is None:
+            raise ValueError("Must specify either num_episodes or num_timesteps")
+        if num_episodes is not None and num_timesteps is not None:
+            raise ValueError("Cannot specify both num_episodes and num_timesteps")
+        
+        self.num_episodes = num_episodes
+        self.num_timesteps = num_timesteps
+        self.env_id = env_manager.env_id
 
     def _call_callbacks(self, fn_name: str, *args, **kwargs):
         return_value = True
@@ -62,52 +71,89 @@ class SimulatorRL:
         self._call_callbacks("init_callback",
                              data=SimulatorRLData(self))
         if isinstance(self.agent, StableBaselinesAdapter):
-            self._train_sb3(self.num_episodes)
+            self._train_sb3()
             return None
         else:
-            return self._env_interaction(self.num_episodes)
+            return self._env_interaction()
 
     def evaluate(self, num_eval_episodes) -> Tuple[float, float]:
         self._call_callbacks("init_callback", data=SimulatorRLData(self))
         self.agent.disable_training()
-        ret = self._env_interaction(num_eval_episodes)
+        ret = self._env_interaction(num_episodes=num_eval_episodes)
         self.agent.enable_training()
         return ret
 
-    def _train_sb3(self, num_episodes: int = 10):
-        logger.info("[{self.experiment_id}] Delegating training to SB3 agent.learn")
-        # For some reason internally max_episodes is actually set to max_episodes * n_envs
-        max_episode_callback = StopTrainingOnMaxEpisodes(max_episodes=num_episodes // self.n_env, verbose=0)
-        sb_callbacks = [max_episode_callback]
+    def _train_sb3(self):
+        logger.info(f"[{self.experiment_id}] Delegating training to SB3 agent.learn")
+        sb_callbacks = []
+        
+        if self.num_episodes is not None:
+            # Episode-based stopping
+            max_episode_callback = StopTrainingOnMaxEpisodes(
+                max_episodes=self.num_episodes // self.n_env, 
+                verbose=0
+            )
+            sb_callbacks.append(max_episode_callback)
+            total_timesteps = 4242424242424  # Arbitrarily large
+        else:
+            # Timestep-based stopping
+            total_timesteps = self.num_timesteps
+        
         for callback in self.callbacks:
             sb_callbacks.append(SB3CallbackAdapter(callback))
+        
         model = self.agent.stable_baselines_unwrapped()
+        model.learn(total_timesteps=total_timesteps, callback=sb_callbacks)
 
-        model.learn(total_timesteps=4242424242424, callback=sb_callbacks)
-
-    def _env_interaction(self, num_episodes: int) -> Tuple[float, float]:
+    def _env_interaction(
+        self, 
+        num_episodes: Optional[int] = None,
+        num_timesteps: Optional[int] = None
+    ) -> Tuple[float, float]:
         """
-        This method assumes we are running on episodic environments.
         Returns the mean and variance of episode returns.
+        
+        Stops when either num_episodes or num_timesteps limit is reached.
         """
-        logger.info(f"[{self.experiment_id}] Running custom loop: total_episodes={num_episodes}")
+        # Use instance variables if not provided
+        if num_episodes is None and num_timesteps is None:
+            num_episodes = self.num_episodes
+            num_timesteps = self.num_timesteps
+        
+        stop_on_episodes = num_episodes is not None
+        stop_on_timesteps = num_timesteps is not None
+        
+        log_msg = f"[{self.experiment_id}] Running custom loop: "
+        if stop_on_episodes:
+            log_msg += f"total_episodes={num_episodes}"
+        if stop_on_timesteps:
+            log_msg += f"total_timesteps={num_timesteps}"
+        logger.info(log_msg)
+        
         self._call_callbacks("on_training_start")
         n_env = self.env_manager.n_envs
         episodes_finished = 0
-        episode_returns = []  # store individual episode returns
+        timesteps_finished = 0
+        episode_returns = []
         entropy_values = []
 
         try:
             obs = self.env_manager.reset()
             ep_return = np.zeros(n_env)
 
-            while episodes_finished < num_episodes:
+            while True:
+                # Check stopping conditions
+                if stop_on_episodes and episodes_finished >= num_episodes:
+                    break
+                if stop_on_timesteps and timesteps_finished >= num_timesteps:
+                    break
+                
                 self._call_callbacks("on_rollout_start")
                 actions = self.agent.choose_action(obs)
                 next_obs, rewards, dones, infos = self.env_manager.step(actions)
-                # self.env_manager.render()
-
+                
                 ep_return += rewards
+                timesteps_finished += n_env
 
                 # Handle finished episodes
                 for i in range(n_env):
@@ -159,7 +205,6 @@ class SimulatorRL:
             ret["std_entropy"] = np.std(entropy_values)
 
         return ret
-                
 
 
 @hydra.main(config_path="../../conf", config_name="config.yaml", version_base=None)
