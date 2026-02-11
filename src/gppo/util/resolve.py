@@ -12,7 +12,8 @@ def resolve_optimizer_cls(optimizer_cfg: dict) -> tuple[type, dict]:
         ```
     """
     optimizer_cfg = optimizer_cfg.copy()
-    target = optimizer_cfg.pop("_target_")
+    target = optimizer_cfg.pop("_target_", False)
+    target = optimizer_cfg.pop("_partial_", False)
     module_path, cls_name = target.rsplit(".", 1)
     cls = getattr(importlib.import_module(module_path), cls_name)
     return cls, optimizer_cfg
