@@ -80,7 +80,11 @@ class AgentFactory:
         if isinstance(env, str):
             env = gym.make(env)
 
-        obs_space = env.observation_space
+        if isinstance(env.observation_space, gym.spaces.dict.Dict):
+            obs_space = env.observation_space['state']   # this might fail
+        else:
+            obs_space = env.observation_space
+        
         action_space = env.action_space
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
