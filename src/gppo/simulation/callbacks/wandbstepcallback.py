@@ -2,9 +2,7 @@ import logging
 import pathlib
 import wandb
 import numpy as np
-import threading
-import time
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List
 from gppo.simulation.callbacks.abstractcallback import AbstractCallback
 from gppo.simulation.simulatorldata import SimulatorRLData
 
@@ -107,14 +105,11 @@ class WandbStepCallback(AbstractCallback):
         """Handle training step-level logging and periodic evaluation."""
         super().on_step(action, reward, next_obs, done)
         
-        self.total_train_timesteps += 1
+        self.total_train_timesteps += self.n_env
         
         # Handle training metrics
         if isinstance(reward, np.ndarray):
             avg_train_reward = np.mean(reward)
-            max_train_reward = np.max(reward)
-            min_train_reward = np.min(reward)
-            std_train_reward = np.std(reward)
             
             self.train_episode_returns += reward
             
@@ -123,9 +118,6 @@ class WandbStepCallback(AbstractCallback):
                     self._handle_train_episode_completion(i)
         else:
             avg_train_reward = reward
-            max_train_reward = reward
-            min_train_reward = reward
-            std_train_reward = 0.0
             
             self.train_episode_returns[0] += reward if self.n_env == 1 else 0
             
@@ -134,8 +126,7 @@ class WandbStepCallback(AbstractCallback):
         
         # Log training step metrics
         if self.total_train_timesteps % self.log_step_frequency == 0:
-            self._log_train_step(avg_train_reward, max_train_reward, 
-                               min_train_reward, std_train_reward)
+            self._log_train_step(avg_train_reward)
         
         # Track for moving average
         self.train_step_rewards_history.append(avg_train_reward)
@@ -190,13 +181,11 @@ class WandbStepCallback(AbstractCallback):
             f"{self.eval_log_prefix}timestep": self.total_train_timesteps,
             f"{self.eval_log_prefix}mean_return": np.mean(eval_episode_returns),
             f"{self.eval_log_prefix}std_return": np.std(eval_episode_returns),
-            f"{self.eval_log_prefix}min_return": np.min(eval_episode_returns),
-            f"{self.eval_log_prefix}max_return": np.max(eval_episode_returns),
             f"{self.eval_log_prefix}mean_length": np.mean(eval_episode_lengths),
             f"{self.eval_log_prefix}total_episodes": self.total_eval_episodes,
         }
         
-        wandb.log(eval_metrics)
+        wandb.log(eval_metrics, step=self.total_train_timesteps)
         
         logger.info(
             f"Evaluation complete: mean_return={np.mean(eval_episode_returns):.2f}, "
@@ -215,11 +204,11 @@ class WandbStepCallback(AbstractCallback):
         train_episode_metrics = {
             "train_episode": self.train_episodes_finished,
             "train_episode_return": episode_return,
-            "train_avg_episode_return": np.mean(self.train_completed_returns[-100:]),
+            # "train_avg_episode_return": np.mean(self.train_completed_returns[-100:]),
             "train_episode_length": episode_length,
             "train_timestep": self.total_train_timesteps,
         }
-        wandb.log(train_episode_metrics)
+        wandb.log(train_episode_metrics, step=self.total_train_timesteps)
         
         logger.debug(
             f"Train episode {self.train_episodes_finished} finished in env {env_idx} "
@@ -228,22 +217,19 @@ class WandbStepCallback(AbstractCallback):
         
         self.train_episode_returns[env_idx] = 0.0
 
-    def _log_train_step(self, avg_reward, max_reward, min_reward, std_reward):
+    def _log_train_step(self, avg_reward):
         """Log training step metrics."""
         step_metrics = {
             "train_timestep": self.total_train_timesteps,
             "train_avg_step_reward": avg_reward,
-            "train_max_step_reward": max_reward,
-            "train_min_step_reward": min_reward,
-            "train_std_step_reward": std_reward,
             "train_episodes_finished": self.train_episodes_finished,
-            "train_avg_ongoing_return": np.mean(self.train_episode_returns),
+            # "train_avg_ongoing_return": np.mean(self.train_episode_returns),
         }
         
-        for i in range(self.n_env):
-            step_metrics[f"train_env_{i}_ongoing_return"] = self.train_episode_returns[i]
+        # for i in range(self.n_env):
+        #    step_metrics[f"train_env_{i}_ongoing_return"] = self.train_episode_returns[i]
         
-        wandb.log(step_metrics)
+        wandb.log(step_metrics, step=self.total_train_timesteps)
 
     def on_learn(self, learning_info: Dict[str, Any]):
         """Log learning metrics from agent updates."""
@@ -252,7 +238,7 @@ class WandbStepCallback(AbstractCallback):
         if learning_info:
             learning_info_with_step = learning_info.copy()
             learning_info_with_step["train_timestep"] = self.total_train_timesteps
-            wandb.log(learning_info_with_step)
+            wandb.log(learning_info_with_step, step=self.total_train_timesteps)
 
     def on_training_end(self):
         """Final logging and cleanup."""
@@ -291,7 +277,7 @@ class WandbStepCallback(AbstractCallback):
             })
         
         if final_stats:
-            wandb.log(final_stats)
+            wandb.log(final_stats, step=self.total_train_timesteps)
 
     def _log_plots(self):
         """Log plot files to WandB."""
@@ -300,7 +286,8 @@ class WandbStepCallback(AbstractCallback):
 
         for ext in ("*.png", "*.svg", "*.pdf"):
             for file in self.plot_dir.glob(ext):
-                wandb.log({f"plots/{file.stem}": wandb.Image(str(file))})
+                wandb.log({f"plots/{file.stem}": wandb.Image(str(file))}, 
+                          step=self.total_train_timesteps)
 
     def _log_summary_csv(self):
         """Create and log summary CSVs."""

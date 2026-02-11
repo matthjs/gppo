@@ -2,7 +2,6 @@ from typing import Union, Optional
 import gymnasium as gym
 from stable_baselines3 import PPO
 import torch
-import importlib
 from gppo.agents.agent import Agent
 from gppo.agents.gppoagent import GPPOAgent
 from gppo.agents.randomagent import RandomAgent
@@ -142,4 +141,3 @@ class AgentFactory:
             agent.load(model_path)
 
         return agent
-
