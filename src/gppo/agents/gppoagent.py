@@ -9,6 +9,8 @@ import torch.nn as nn
 from typing import Dict, Any, List
 import logging
 
+from gppo.util.resolve import resolve_optimizer_cls
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
 
@@ -47,6 +49,7 @@ class GPPOAgent(OnPolicyAgent):
             sample_vf: bool = True,
             target_kl: Optional[float] = None,
             device: torch.device = torch.device("cpu"),
+            optimizer_cfg: dict = None,
             **kwargs
     ):
         """
@@ -95,7 +98,12 @@ class GPPOAgent(OnPolicyAgent):
         self.n_steps = n_steps
         self.n_envs = n_envs
 
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.learning_rate)
+        self.optimizer = None
+        if optimizer_cfg:
+            cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
+            self.optimizer = cls(self.parameters(), **kwargs)
+        else:
+            self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         self.n_epochs = n_epochs
         self.gae_lambda = gae_lambda
         self.clip_range = clip_range

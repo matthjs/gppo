@@ -2,11 +2,13 @@ from typing import Union, Optional
 import gymnasium as gym
 from stable_baselines3 import PPO
 import torch
+import importlib
 from gppo.agents.agent import Agent
 from gppo.agents.gppoagent import GPPOAgent
 from gppo.agents.randomagent import RandomAgent
 from gppo.agents.ppoagent import PPOAgent
 from gppo.agents.sbadapter import StableBaselinesAdapter
+from gppo.util.resolve import resolve_optimizer_cls
 
 
 class AgentFactory:
@@ -61,6 +63,7 @@ class AgentFactory:
                      env: Union[gym.Env, str],
                      n_envs: int,
                      agent_params: dict,
+                     optimizer_cfg: dict = None,
                      load_model: bool = False,
                      model_path: Optional[str] = None,
                      device=None) -> Agent:
@@ -109,12 +112,21 @@ class AgentFactory:
                     raise ValueError(f"Invalid architecture_choice {arch_choice} for GPPOAgent.")
                 # Update agent_params with architecture config
                 agent_params.update(arch_config)
+            if optimizer_cfg:
+                agent_params["optimizer_cfg"] = optimizer_cfg
             agent = GPPOAgent(**agent_params)
         elif agent_type == "SB_PPO":
             agent_params.update({
                 "policy": "MlpPolicy",   # NOTE: This is hardcoded for now.
                 "env": env,
             })
+            if optimizer_cfg:
+                opt_cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
+                kwargs.pop("lr", None)
+                agent_params["policy_kwargs"] = {
+                    "optimizer_class": opt_cls,
+                    "optimizer_kwargs": kwargs
+                }
             agent = StableBaselinesAdapter(PPO(**agent_params))
         elif agent_type == "RANDOM":
             agent = RandomAgent(action_space)
