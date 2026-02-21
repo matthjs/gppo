@@ -16,6 +16,7 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 import wandb
 import numpy as np
 import gymnasium as gym
+from ale_py.vector_env import AtariVectorEnv
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -55,14 +56,16 @@ class EnvManager:
         self.env_id = env_id
 
         if env_fns is None and env_fn is None:
-            raise ValueError("Provide env_fns (sequence) or env_fn (single callable)")
+            raise ValueError(
+                "Provide env_fns (sequence) or env_fn (single callable)")
 
         if env_fns is None:
             env_fns = [env_fn for _ in range(n_envs)]
         else:
             n_envs = len(env_fns)
 
-        self.training = training   # e.g. used to determine whether to update moving averages for VecNormalize
+        # e.g. used to determine whether to update moving averages for VecNormalize
+        self.training = training
 
         self.env_fns = env_fns
         self.n_envs = n_envs
@@ -81,16 +84,25 @@ class EnvManager:
         self._create_vec_env()
 
     def _create_vec_env(self) -> None:
+        # If env_fns contains an AtariVectorEnv already, use it directly
+        if len(self.env_fns) == 1 and isinstance(self.env_fns[0](), AtariVectorEnv):
+            logger.info("Using native AtariVectorEnv directly")
+            self.vec_env = self.env_fns[0]()
+            return
+
+        # Otherwise, use standard SB3 VecEnv logic
         if self.use_subproc:
-            logger.info("Creating SubprocVecEnv with %d processes", self.n_envs)
+            logger.info(
+                "Creating SubprocVecEnv with %d processes", self.n_envs)
             self.vec_env = SubprocVecEnv(list(self.env_fns))
         else:
             logger.info("Creating DummyVecEnv with %d envs", self.n_envs)
             self.vec_env = DummyVecEnv(list(self.env_fns))
 
+        # Optional normalization
         if (self.norm_obs or self.norm_reward) and VecNormalize is not None:
-            logger.info("Wrapping vec_env with VecNormalize (obs=%s, reward=%s)", self.norm_obs, self.norm_reward)
-            # TODO: Double check that SB3 VecNormalize behaves the same way as custom implementation
+            logger.info("Wrapping vec_env with VecNormalize (obs=%s, reward=%s)",
+                        self.norm_obs, self.norm_reward)
             self.vec_env = VecNormalize(
                 self.vec_env,
                 training=self.training,
@@ -119,6 +131,7 @@ class EnvManager:
 def make_env():
     return gym.make("CartPole-v1")  # simple test environment
 
+
 def test_sb3():
     manager = EnvManager(env_fn=make_env, n_envs=4, norm_obs=True)
 
@@ -135,6 +148,8 @@ def test_sb3():
     manager.close()
 
 # Simple main script to test out functionality
+
+
 def main():
     print("=== Single Environment ===")
     manager = EnvManager(env_fn=make_env, n_envs=1)
@@ -148,11 +163,13 @@ def main():
     manager.close()
 
     print("\n=== Multiple Environments ===")
-    manager_multi = EnvManager(env_fn=make_env, n_envs=3, use_subproc=True, norm_obs=True)
+    manager_multi = EnvManager(
+        env_fn=make_env, n_envs=3, use_subproc=True, norm_obs=True)
     obs_multi = manager_multi.reset()
     print("Reset output shape:", obs_multi.shape)
 
-    actions = np.array([manager_multi.vec_env.action_space.sample() for _ in range(3)])
+    actions = np.array([manager_multi.vec_env.action_space.sample()
+                       for _ in range(3)])
     obs_multi, rewards, dones, infos = manager_multi.step(actions)
     print("Step outputs:")
     print("Observations:", obs_multi)
