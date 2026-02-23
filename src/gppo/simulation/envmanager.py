@@ -46,6 +46,7 @@ class EnvManager:
         env_fn: Optional[Callable[[], Any]] = None,
         n_envs: int = 1,
         use_subproc: bool = True,
+        use_direct: bool = False,
         norm_obs: bool = False,
         clip_obs: float = 10.0,
         epsilon: float = 1e-8,
@@ -70,6 +71,7 @@ class EnvManager:
         self.env_fns = env_fns
         self.n_envs = n_envs
         self.use_subproc = use_subproc and SubprocVecEnv is not None
+        self.use_direct = use_direct
         self.gamma = gamma
 
         # Normalize observations settings
@@ -84,9 +86,7 @@ class EnvManager:
         self._create_vec_env()
 
     def _create_vec_env(self) -> None:
-        # If env_fns contains an AtariVectorEnv already, use it directly
-        if len(self.env_fns) == 1 and isinstance(self.env_fns[0](), AtariVectorEnv):
-            logger.info("Using native AtariVectorEnv directly")
+        if self.use_direct:
             self.vec_env = self.env_fns[0]()
             return
 

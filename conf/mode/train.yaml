@@ -1,10 +1,10 @@
 name: train
 
-execute: False
+execute: True
 load_model: False
 save_model: True
 model_path: "../models"   # e.g., /models/gppo/file.pth
-import_metrics: True
+import_metrics: False
 export_metrics: True
 # List of agents to import/enable
 agents:
