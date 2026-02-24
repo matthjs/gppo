@@ -1,4 +1,6 @@
 from typing import Callable, Optional, Union
+
+import gpytorch
 from gppo.gp.actorcriticdgp import ActorCriticDGP
 from gppo.gp.deepsigma import sample_from_gmm
 from gppo.gp.mll.actorcriticmll import ActorCriticMLL
@@ -130,6 +132,7 @@ class GPPOAgent(OnPolicyAgent):
         self.last_value = None
         self.last_done = None
         self.next_state = None
+        # self.jitter = 1e-3
 
     def choose_action(
             self,
@@ -145,6 +148,7 @@ class GPPOAgent(OnPolicyAgent):
         :return: Sampled action.
         """
         self.policy.eval()
+        # with torch.inference_mode(), gpytorch.settings.cholesky_jitter(self.jitter):
         with torch.no_grad():
             # state = torch.tensor(observation, dtype=torch.float32, device=self.device).unsqueeze(0)
             state = torch.tensor(observation, dtype=torch.float32, device=self.device)# .unsqueeze(0)
