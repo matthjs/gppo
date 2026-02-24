@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecFrameStack, VecNormalize
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.base_class import BaseAlgorithm
 import wandb
@@ -47,6 +47,8 @@ class EnvManager:
         n_envs: int = 1,
         use_subproc: bool = True,
         use_direct: bool = False,
+        frame_stack: bool = False,
+        n_stack: int  = 4,
         norm_obs: bool = False,
         clip_obs: float = 10.0,
         epsilon: float = 1e-8,
@@ -72,6 +74,8 @@ class EnvManager:
         self.n_envs = n_envs
         self.use_subproc = use_subproc and SubprocVecEnv is not None
         self.use_direct = use_direct
+        self.frame_stack = frame_stack
+        self.n_stack = n_stack
         self.gamma = gamma
 
         # Normalize observations settings
@@ -87,6 +91,7 @@ class EnvManager:
 
     def _create_vec_env(self) -> None:
         if self.use_direct:
+            logger.info("Not wrapping the environment")
             self.vec_env = self.env_fns[0]()
             return
 
@@ -99,6 +104,8 @@ class EnvManager:
             logger.info("Creating DummyVecEnv with %d envs", self.n_envs)
             self.vec_env = DummyVecEnv(list(self.env_fns))
 
+        if self.frame_stack:
+            self.vec_env = VecFrameStack(self.vec_env, n_stack=self.n_stack)
         # Optional normalization
         if (self.norm_obs or self.norm_reward) and VecNormalize is not None:
             logger.info("Wrapping vec_env with VecNormalize (obs=%s, reward=%s)",
