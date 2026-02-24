@@ -93,8 +93,21 @@ class AgentFactory:
         })
 
         agent = None
-
-        if agent_type == "PPO":   # DEPRECATED: Because the other implementation assume parallel envs
+        if agent_type == "DQN":
+            # This looks like syntactic nonsense, but basically we want to overwrite the class
+            # type and name so that the dueling architecture variant is treated as a separate agent_type.
+            agent = DQNAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+                type("DuelingDQNAgent", (DQNAgent,), {})(**agent_params)
+        elif agent_type == "DDQN":
+            agent = DDQNAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+                type("DuelingDDQNAgent", (DDQNAgent,), {})(**agent_params)
+        elif agent_type == "DQV":
+            agent = DQVAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+                type("DuelingDQVAgent", (DQVAgent,), {})(**agent_params)
+        elif agent_type == "DQV-Max":
+            agent = DQVMaxAgent(**agent_params) if not agent_params['dueling_architecture'] else \
+                type("DQVMaxAgent", (DQVMaxAgent,), {})(**agent_params)
+        elif agent_type == "PPO":
             agent_params.update({
                 "state_dimensions": obs_space.shape,
                 "action_dimensions": action_space.shape,

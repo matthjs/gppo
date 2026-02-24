@@ -2,6 +2,7 @@
 Taken directly from the corresponding SB3 implementations:
 https://github.com/DLR-RM/stable-baselines3/blob/master/stable_baselines3/common/utils.py#L68
 """
+from typing import Callable
 import torch
 
 def update_learning_rate(optimizer: torch.optim.Optimizer, learning_rate: float) -> None:
