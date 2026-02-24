@@ -102,7 +102,7 @@ class PPOAgent(OnPolicyAgent):
         self.next_state = None
 
         if self.torch_compile:
-            self._ppo_clip = torch.compile(self._ppo_clip)
+            self._compute_ppo_loss = torch.compile(self._compute_ppo_loss)
 
     def choose_action(self, observation: np.ndarray) -> Any:
         self.policy.eval()
