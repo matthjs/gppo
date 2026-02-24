@@ -137,7 +137,6 @@ class AgentFactory:
             agent = GPPOAgent(**agent_params)
         elif agent_type == "SB_PPO":
             agent_params.update({
-                "policy": "MlpPolicy",   # NOTE: This is hardcoded for now.
                 "env": env,
             })
             if optimizer_cfg:
