@@ -3,6 +3,10 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 import torch
 from gppo.agents.agent import Agent
+from gppo.agents.ddqnagent import DDQNAgent
+from gppo.agents.dqnagent import DQNAgent
+from gppo.agents.dqvagent import DQVAgent
+from gppo.agents.dqvmax import DQVMaxAgent
 from gppo.agents.gppoagent import GPPOAgent
 from gppo.agents.randomagent import RandomAgent
 from gppo.agents.ppoagent import PPOAgent
