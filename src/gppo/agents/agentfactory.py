@@ -1,6 +1,6 @@
 from typing import Union, Optional
 import gymnasium as gym
-from stable_baselines3 import PPO
+from stable_baselines3 import DQN, PPO
 import torch
 from gppo.agents.agent import Agent
 from gppo.agents.ddqnagent import DDQNAgent
@@ -147,6 +147,18 @@ class AgentFactory:
                     "optimizer_kwargs": kwargs
                 }
             agent = StableBaselinesAdapter(PPO(**agent_params))
+        elif agent_type == "SB_DQN":
+            agent_params.update({
+                "env": env,
+            })
+            if optimizer_cfg:
+                opt_cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
+                kwargs.pop("lr", None)
+                agent_params["policy_kwargs"] = {
+                    "optimizer_class": opt_cls,
+                    "optimizer_kwargs": kwargs
+                }
+            agent = StableBaselinesAdapter(DQN(**agent_params))
         elif agent_type == "RANDOM":
             agent = RandomAgent(action_space)
         else:
