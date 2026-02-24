@@ -1,4 +1,5 @@
 from abc import ABC
+from typing import Union
 import torch
 from gppo.agents.agent import Agent
 from gppo.util.rolloutbuffer import RolloutBuffer
@@ -14,7 +15,7 @@ class OnPolicyAgent(Agent, ABC):
                  state_dimensions,
                  action_dimensions,
                  batch_size: int,
-                 learning_rate: float,
+                 learning_rate: Union[float, callable],
                  discount_factor: float,
                  device: torch.device):
         super().__init__()

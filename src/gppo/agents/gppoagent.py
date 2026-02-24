@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 from gppo.gp.actorcriticdgp import ActorCriticDGP
 from gppo.gp.deepsigma import sample_from_gmm
 from gppo.gp.mll.actorcriticmll import ActorCriticMLL
@@ -38,11 +38,11 @@ class GPPOAgent(OnPolicyAgent):
             n_steps: int = 512,
             n_envs: int = 1,
             batch_size: int = 128,
-            learning_rate: float = 3e-4,
+            learning_rate: Union[float, Callable[[float], float]] = 3e-4,
             n_epochs: int = 10,
             gamma: float = 0.99,
             gae_lambda: float = 0.95,
-            clip_range: float = 0.2,
+            clip_range: Union[float, Callable[[float], float]] = 0.2,
             ent_coef: float = 0.0,
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
