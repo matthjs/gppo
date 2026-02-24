@@ -14,10 +14,25 @@ class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
     :param clip_range: PPO clipping range.
     :param beta: Temperature parameter for the posterior approximation.
     """
-    def __init__(self, likelihood, model, num_data, clip_range, beta):
+    def __init__(self, likelihood, model, num_data, clip_range, beta, torch_compile: bool = False):
         super().__init__(likelihood, model, num_data, beta)
         self.clip_range = clip_range
         self.last_log_prob = None
+        if torch_compile:
+            self._ppo_clip = torch.compile(self._ppo_clip)
+
+    @staticmethod
+    def _ppo_clip(
+        deep_log_prob: torch.Tensor,
+        old_log_probs: torch.Tensor,
+        advantages: torch.Tensor,
+        clip_range: float,
+    ) -> torch.Tensor:
+        # Note: Subtraction is division in log space.
+        ratio = torch.exp(deep_log_prob - old_log_probs)
+        surr1 = ratio * advantages
+        surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * advantages
+        return torch.min(surr1, surr2).squeeze(-1).sum(-1)     # THE SUM IS IMPORTANT HERE.
 
     def _log_likelihood_term(self, approximate_dist_f, target, **kwargs):
         """
@@ -56,10 +71,8 @@ class PolicyGradientDeepPredictiveLogLikelihood(DeepPredictiveLogLikelihood):
             raise ValueError(f"Advantage shape {advantages.shape} must match "
                              f"log_prob shape {deep_log_prob.shape}")
 
-        ratio = torch.exp(deep_log_prob - old_log_probs)    # Note: Subtraction is division in log space.
-        surr1 = ratio * advantages
-        surr2 = torch.clamp(ratio, 1.0 - self.clip_range, 1.0 + self.clip_range) * advantages
-        policy_loss = torch.min(surr1, surr2).squeeze(-1).sum(-1)   # THE SUM IS IMPORTANT HERE.
+        policy_loss = self._ppo_clip(
+            deep_log_prob, old_log_probs, advantages, self.clip_range)
 
         self.last_log_prob = deep_log_prob
         return policy_loss

@@ -9,6 +9,7 @@ import torch.nn as nn
 from typing import Dict, Any, Optional
 from torch.nn import functional as F
 from gppo.util.network import ActorCriticMLP
+from gppo.util.resolve import resolve_optimizer_cls
 
 
 class PPOAgent(OnPolicyAgent):
@@ -35,6 +36,8 @@ class PPOAgent(OnPolicyAgent):
             vf_coef: float = 0.5,
             max_grad_norm: float = 0.5,
             device: torch.device = torch.device("cpu"),
+            torch_compile: bool = False,
+            optimizer_cfg: dict = None,
             **kwargs
     ):
         """
@@ -74,8 +77,17 @@ class PPOAgent(OnPolicyAgent):
             input_dim=input_dim,
             action_dim=action_dim,
         ).to(self.device)
-        self.optimizer = torch.optim.Adam(
-            self.policy.parameters(), lr=self.learning_rate)
+        self.torch_compile = torch_compile
+        if self.torch_compile:
+            self.policy = torch.compile(self.policy)
+
+        self.optimizer = None
+        if optimizer_cfg:
+            cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
+            self.optimizer = cls(self.parameters(), **kwargs)
+        else:
+            self.optimizer = torch.optim.Adam(self.policy.parameters(),
+                                lr=self.learning_rate)
         self.n_epochs = n_epochs
         self.gae_lambda = gae_lambda
         self.clip_range = clip_range
@@ -88,6 +100,9 @@ class PPOAgent(OnPolicyAgent):
         self.last_value = None
         self.last_done = None
         self.next_state = None
+
+        if self.torch_compile:
+            self._ppo_clip = torch.compile(self._ppo_clip)
 
     def choose_action(self, observation: np.ndarray) -> Any:
         self.policy.eval()
@@ -140,6 +155,39 @@ class PPOAgent(OnPolicyAgent):
             self.gae_lambda,
         )
 
+    @staticmethod
+    def _compute_ppo_loss(
+        log_probs: torch.Tensor,
+        old_log_probs: torch.Tensor,
+        advantages: torch.Tensor,
+        returns: torch.Tensor,
+        values: torch.Tensor,
+        clip_range: float,
+        vf_coef: float,
+        ent_coef: float,
+        entropy_loss: torch.Tensor,
+        clip_range_vf: Optional[float] = None,
+    ):
+        # Policy loss
+        # Note: Subtraction is division in log space.
+        ratio = torch.exp(log_probs - old_log_probs)
+        surr1 = ratio * advantages
+        surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * advantages
+        policy_loss = -torch.min(surr1, surr2).mean()
+
+        if clip_range_vf is None:
+            value_pred = values
+        else:
+            # Clip the difference between old and new value.,
+            old_values = returns - advantages # Directly use buffer's returns/advantages
+            value_pred = old_values + torch.clamp(values - old_values, -clip_range_vf, clip_range_vf)
+        # Value loss --> TD(gae_lambda) target.
+        value_loss = F.mse_loss(returns, value_pred.unsqueeze(-1))
+        entropy_loss_term = ent_coef * entropy_loss
+        # Full surrogate loss: L_clip - c1 * L_VF + c_2 S[pi](s_t)
+        loss = policy_loss + vf_coef * value_loss + entropy_loss_term
+        return loss, policy_loss, value_loss
+
     def learn(self) -> Dict[str, Any]:
         """
         Usage: run the learn() method at every timestep in the environment,
@@ -167,31 +215,11 @@ class PPOAgent(OnPolicyAgent):
                 log_probs = dist.log_prob(actions).sum(dim=-1, keepdim=True)
                 entropy_loss = -dist.entropy().sum(dim=-1).mean()  # Sum over actions before mean
 
-                # Policy loss
-                # Note: Subtraction is division in log space.
-                ratio = torch.exp(log_probs - old_log_probs)
-                surr1 = ratio * advantages
-                surr2 = torch.clamp(
-                    ratio, 1.0 - self.clip_range, 1.0 + self.clip_range) * advantages
-                policy_loss = -torch.min(surr1, surr2).mean()
-
-                # Value loss
-                if self.clip_range_vf is None:
-                    value_pred = values
-                else:
-                    # Clip the difference between old and new value.,
-                    old_values = returns - advantages  # Directly use buffer's returns/advantages
-                    value_pred = old_values + torch.clamp(
-                        values - old_values,
-                        -self.clip_range_vf,
-                        self.clip_range_vf,
-                    )
-
-                # Value loss --> TD(gae_lambda) target.
-                value_loss = F.mse_loss(returns, value_pred.unsqueeze(-1))
-
-                # Full surrogate loss: L_clip - c1 * L_VF + c_2 S[pi](s_t)
-                loss = policy_loss + self.vf_coef * value_loss + self.ent_coef * entropy_loss
+                loss, policy_loss, value_loss = self._compute_ppo_loss(
+                    log_probs, old_log_probs, advantages, returns,
+                    values, self.clip_range, self.vf_coef,
+                    self.ent_coef, entropy_loss
+                )
                 losses.append(loss.item())
 
                 info["value_loss"] += value_loss.item()

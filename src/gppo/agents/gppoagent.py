@@ -49,6 +49,7 @@ class GPPOAgent(OnPolicyAgent):
             sample_vf: bool = True,
             target_kl: Optional[float] = None,
             device: torch.device = torch.device("cpu"),
+            torch_compile: bool = False,
             optimizer_cfg: dict = None,
             **kwargs
     ):
@@ -94,6 +95,9 @@ class GPPOAgent(OnPolicyAgent):
             Q=num_quad_sites,
             num_actions=action_dimensions[-1]
         ).to(self.device)
+        self.torch_compile = torch_compile
+        if self.torch_compile:
+            self.policy = torch.compile(self.policy)
 
         self.n_steps = n_steps
         self.n_envs = n_envs

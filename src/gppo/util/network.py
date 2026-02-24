@@ -1,6 +1,6 @@
 from typing import List, Tuple, Optional
 import torch
-from torch.distributions import Normal
+from torch.distributions import Categorical, Normal
 import torch.nn as nn
 import numpy as np
 
@@ -126,8 +126,11 @@ class ActorCriticMLP(nn.Module):
             input_dim: int,
             action_dim: int,
             hidden_sizes: List[int] = [64, 64],
+            ortho_init: bool = True,
+            discrete: bool = False
     ):
         super().__init__()
+        self.discrete = discrete
         # build MLP
         layers = []
         last_dim = input_dim
@@ -141,15 +144,106 @@ class ActorCriticMLP(nn.Module):
         self.action_log_std = nn.Parameter(torch.zeros(1, action_dim))
         # critic head
         self.value_head = nn.Linear(last_dim, 1)
+        if ortho_init:
+            self._init_weights()
+
+    def _init_weights(self):
+        # Shared trunk: orthogonal with sqrt(2) is the standard gain for ReLU activations
+        for layer in self.shared:
+            if isinstance(layer, nn.Linear):
+                nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
+                nn.init.zeros_(layer.bias)
+
+        # Small gain keeps the initial policy close to uniform across actions
+        nn.init.orthogonal_(self.action_mean.weight, gain=0.01)
+        nn.init.zeros_(self.action_mean.bias)
+
+        # Standard gain for the value head
+        nn.init.orthogonal_(self.value_head.weight, gain=1.0)
+        nn.init.zeros_(self.value_head.bias)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
         x = self.shared(x)
         # value
         value = self.value_head(x).squeeze(-1)
         # action distribution
-        mean = self.action_mean(x)
-        std = torch.exp(self.action_log_std)
-        dist = Normal(mean, std)
-        log_std = self.action_log_std
-        return dist, value, log_std
 
+        if self.discrete:
+            logits = self.action_mean(x)
+            dist = Categorical(logits=logits)
+            return dist, value, None
+        else:
+            mean = self.action_mean(x)
+            std = torch.exp(self.action_log_std)
+            return Normal(mean, std), value, self.action_log_std
+
+
+class ActorCriticCNN(nn.Module):
+    """
+    CNN-based Actor-Critic for image-based observation spaces.
+    Reuses the convolutional feature extractor from ConvNetEstimator,
+    then splits into actor (policy) and critic (value) heads.
+    Suitable for PPO and similar on-policy algorithms.
+    """
+    def __init__(
+            self,
+            input_channels: int = 4,
+            action_dim: int = 6,
+            use_residual: bool = False,
+            feature_dim: int = 512,
+            ortho_init: bool = True,
+            discrete: bool = False
+    ):
+        super().__init__()
+        self.discrete = discrete
+        self.input_channels = input_channels
+
+        # Reuse the proven conv backbone — borrow it from a throwaway estimator instance
+        # so we don't duplicate the architecture definition.
+        _backbone = ConvNetEstimator(input_channels, action_dim, use_residual)
+        self.feature_extractor = _backbone.feature_extractor  # Sequential up to the 512-d ReLU
+
+        # Actor head: outputs mean of a Gaussian policy
+        self.action_mean = nn.Linear(feature_dim, action_dim)
+        self.action_log_std = nn.Parameter(torch.zeros(1, action_dim))
+
+        # Critic head: outputs a scalar state-value estimate
+        self.value_head = nn.Linear(feature_dim, 1)
+
+        if ortho_init:
+            self._init_weights()
+
+    def _init_weights(self):
+        """Orthogonal init is standard practice for PPO heads."""
+        nn.init.orthogonal_(self.action_mean.weight, gain=0.01)
+        nn.init.zeros_(self.action_mean.bias)
+        nn.init.orthogonal_(self.value_head.weight, gain=1.0)
+        nn.init.zeros_(self.value_head.bias)
+
+    def _preprocess(self, state: np.ndarray | torch.Tensor) -> torch.Tensor:
+        """Shared input handling: numpy conversion, batch dim, channel ordering."""
+        if isinstance(state, np.ndarray):
+            state = torch.tensor(state, dtype=torch.float32)
+        if state.dim() == 3:
+            state = state.unsqueeze(0)
+        if state.shape[1] != self.input_channels:           # [B, H, W, C] -> [B, C, H, W]
+            state = state.permute(0, 3, 1, 2)
+        return state
+
+    def forward(self, state: np.ndarray | torch.Tensor) -> Tuple[Normal, torch.Tensor, torch.Tensor]:
+        """
+        :param state: [C, H, W] or [B, C, H, W] image (numpy or tensor).
+        :return: (action_distribution, state_value, action_log_std)
+        """
+        x = self.feature_extractor(self._preprocess(state))
+        # Critic
+        value = self.value_head(x).squeeze(-1)
+
+        # Actor
+        if self.discrete:
+            dist = Categorical(logits=self.action_mean(x))
+            return dist, value, None
+        else:
+            mean = self.action_mean(x)
+            std = torch.exp(self.action_log_std)
+            return Normal(mean, std.expand_as(mean)), value, self.action_log_std

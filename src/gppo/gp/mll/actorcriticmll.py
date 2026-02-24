@@ -32,13 +32,16 @@ class ActorCriticMLL:
                  value_likelihood,
                  num_data,
                  clip_range: float, vf_coef: float, ent_coef: float,
-                 beta: float):
+                 beta: float,
+                 torch_compile: bool = False):
+        self.torch_compile = torch_compile
         self.mll_policy = PolicyGradientDeepPredictiveLogLikelihood(
             policy_likelihood,
             model,
             num_data=num_data,
             clip_range=clip_range,
-            beta=beta
+            beta=beta,
+            torch_compile=torch_compile
         )
 
         # Can just use the regular likelihood for the value function.
