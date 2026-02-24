@@ -105,9 +105,9 @@ class GPPOAgent(OnPolicyAgent):
         self.optimizer = None
         if optimizer_cfg:
             cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
-            self.optimizer = cls(self.parameters(), **kwargs)
+            self.optimizer = cls(self.policy.parameters(), **kwargs)
         else:
-            self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.lr)
         self.n_epochs = n_epochs
         self.gae_lambda = gae_lambda
         self.clip_range = clip_range
