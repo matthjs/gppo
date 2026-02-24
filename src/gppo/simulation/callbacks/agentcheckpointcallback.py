@@ -2,6 +2,8 @@ import os
 import pickle
 import logging
 from typing import Optional, Union
+
+import numpy as np
 from gppo.simulation.callbacks.abstractcallback import AbstractCallback
 from gppo.simulation.simulatorldata import SimulatorRLData
 
@@ -41,6 +43,7 @@ class AgentCheckpointCallback(AbstractCallback):
         self.run_filepath = None
         self.top_filepath = None
         self.episodes_finished = 0
+        self.n_env = None
 
     def init_callback(self, data: SimulatorRLData) -> None:
         super().init_callback(data)
@@ -49,6 +52,7 @@ class AgentCheckpointCallback(AbstractCallback):
         self.env_id = getattr(data, "env_id")
         self.exp_id = getattr(data, "experiment_id")
         self.save_base = getattr(data, "save_path", self.save_base)
+        self.n_env = data.n_env
 
         # create run directory and filepaths
         self.run_dir = os.path.join(self.save_base, self.exp_id, self.env_id, self.agent_id, self.run_id)
@@ -93,6 +97,17 @@ class AgentCheckpointCallback(AbstractCallback):
             return
 
         logger.info("No agent checkpoint found for run (%s) or top-level, skipping load.", self.run_filepath)
+
+    def on_step(self, action, reward, next_obs, done) -> bool:
+        super().on_step(action, reward, next_obs, done)
+
+        if isinstance(done, np.ndarray):
+            for i in range(self.n_env):
+                if done[i]:
+                    self.on_episode_end()
+        else:
+            if done:
+                self.on_episode_end()
 
     def on_episode_end(self) -> None:
         super().on_episode_end()

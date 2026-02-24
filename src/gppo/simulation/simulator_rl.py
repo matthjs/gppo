@@ -161,8 +161,6 @@ class SimulatorRL:
                         episodes_finished += 1
                         episode_returns.append(ep_return[i])
                         ep_return[i] = 0.0
-                        # Maybe remove on_episode_end at some point
-                        self._call_callbacks("on_episode_end")
 
                 if not self._call_callbacks("on_step",
                                             action=actions,
