@@ -57,8 +57,8 @@ class AgentCheckpointCallback(AbstractCallback):
         # create run directory and filepaths
         self.run_dir = os.path.join(self.save_base, self.exp_id, self.env_id, self.agent_id, self.run_id)
         os.makedirs(self.run_dir, exist_ok=True)
-        self.run_filepath = os.path.join(self.run_dir, f"{self.agent_id}_run_{self.run_id}.pt")
-        self.top_filepath = os.path.join(self.save_base, f"{self.agent_id}{self.env_id}run_{self.run_id}.pt")
+        self.run_filepath = os.path.join(self.run_dir, f"{self.agent_id}_run_{self.run_id}")
+        self.top_filepath = os.path.join(self.save_base, f"{self.agent_id}{self.env_id}run_{self.run_id}")
 
     def _save_agent_to(self, path: str) -> None:
         if self.agent is None:
@@ -75,15 +75,19 @@ class AgentCheckpointCallback(AbstractCallback):
         if self.agent is None:
             logger.warning("AgentCheckpointCallback: no agent to load into.")
             return False
-        if not os.path.exists(path):
-            return False
-        try:
-            self.agent.load(path)
-            logger.info("Loaded agent from %s", path)
-            return True
-        except Exception as e:
-            logger.exception("Failed to load agent from %s: %s", path, e)
-            return False
+        # support both .zip (SB3) and .pt
+        candidates = [path + ".zip", path + ".pt"]
+        for candidate in candidates:
+            if not os.path.exists(candidate):
+                continue
+            try:
+                self.agent.load(candidate)
+                logger.info("Loaded agent from %s", candidate)
+                return True
+            except Exception as e:
+                logger.exception("Failed to load agent from %s: %s", candidate, e)
+                return False
+        return False
 
     def on_training_start(self) -> None:
         super().on_training_start()
@@ -108,6 +112,7 @@ class AgentCheckpointCallback(AbstractCallback):
         else:
             if done:
                 self.on_episode_end()
+        return True
 
     def on_episode_end(self) -> None:
         super().on_episode_end()

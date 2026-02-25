@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecFrameStack, VecNormalize
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv, VecFrameStack, VecNormalize, VecTransposeImage
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.base_class import BaseAlgorithm
 import wandb
@@ -106,6 +106,7 @@ class EnvManager:
 
         if self.frame_stack:
             self.vec_env = VecFrameStack(self.vec_env, n_stack=self.n_stack)
+            self.vec_env = VecTransposeImage(self.vec_env)
         # Optional normalization
         if (self.norm_obs or self.norm_reward) and VecNormalize is not None:
             logger.info("Wrapping vec_env with VecNormalize (obs=%s, reward=%s)",
