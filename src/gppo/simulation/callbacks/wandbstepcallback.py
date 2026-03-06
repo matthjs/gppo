@@ -86,15 +86,15 @@ class WandbStepCallback(AbstractCallback):
         if self.do_evaluation:
             logger.info(f"Evaluation enabled: every {self.eval_frequency} steps, {self.eval_episodes} episodes")
         
-        self.run = wandb.init(
-            project=self.project,
-            entity=self.entity,
-            name=self.run_name,
-            group=self.group,
-            tags=self.tags,
-            config=self.config,
-            reinit=True,
-        )
+        if self.run is None:
+            self.run = wandb.init(
+                project=self.project,
+                entity=self.entity,
+                name=self.run_name,
+                group=self.group,
+                tags=self.tags,
+                config=self.config,
+            )
         
         logger.info(
             f"WandbStepCallback initialized with {self.n_env} training environments "
@@ -244,18 +244,19 @@ class WandbStepCallback(AbstractCallback):
         """Final logging and cleanup."""
         super().on_training_end()
         
-        # Run final evaluation
-        if self.do_evaluation:
-            logger.info("Running final evaluation...")
-            self._run_evaluation()
-            self.eval_env_manager.close()
-        
-        self._log_final_stats()
-        self._log_plots()
-        self._log_summary_csv()
-        
-        wandb.finish()
-        logger.info("WandbStepCallback training ended and WandB run closed.")
+        if self.finalize:
+            # Run final evaluation
+            if self.do_evaluation:
+                logger.info("Running final evaluation...")
+                self._run_evaluation()
+                self.eval_env_manager.close()
+            
+            self._log_final_stats()
+            self._log_plots()
+            self._log_summary_csv()
+            
+            wandb.finish()
+            logger.info("WandbStepCallback training ended and WandB run closed.")
 
     def _log_final_stats(self):
         """Log final statistics."""

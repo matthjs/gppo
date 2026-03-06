@@ -93,4 +93,5 @@ class StableBaselinesAdapter(Agent):
         :param path: File path (without extension) from which to load the model.
         """
         model_class = type(self._sb_model)
-        self._sb_model = model_class.load(path)
+        env = self._sb_model.env
+        self._sb_model = model_class.load(path, env=env)

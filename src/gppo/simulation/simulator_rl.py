@@ -23,6 +23,7 @@ from linear_operator.utils.errors import NotPSDError
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
 class SimulatorRL:
     """High-level trainer supporting SB3 agents or custom agents."""
 
@@ -48,13 +49,15 @@ class SimulatorRL:
         self.save_model = save_model
         self.load_model = load_model
         self.device = device
-        
+
         # Validate inputs
         if num_episodes is None and num_timesteps is None:
-            raise ValueError("Must specify either num_episodes or num_timesteps")
+            raise ValueError(
+                "Must specify either num_episodes or num_timesteps")
         if num_episodes is not None and num_timesteps is not None:
-            raise ValueError("Cannot specify both num_episodes and num_timesteps")
-        
+            raise ValueError(
+                "Cannot specify both num_episodes and num_timesteps")
+
         self.num_episodes = num_episodes
         self.num_timesteps = num_timesteps
         self.env_id = env_manager.env_id
@@ -67,14 +70,13 @@ class SimulatorRL:
                 return_value = return_value and ret
         return return_value
 
-    def train(self) -> Optional[Tuple[float, float]]:
-        self._call_callbacks("init_callback",
-                             data=SimulatorRLData(self))
+    def train(self, finalize: bool = True) -> Optional[Tuple[float, float]]:
+        self._call_callbacks("init_callback", data=SimulatorRLData(self))
         if isinstance(self.agent, StableBaselinesAdapter):
-            self._train_sb3()
+            self._train_sb3(finalize=finalize)
             return None
         else:
-            return self._env_interaction()
+            return self._env_interaction(finalize=finalize)
 
     def evaluate(self, num_eval_episodes) -> Tuple[float, float]:
         self._call_callbacks("init_callback", data=SimulatorRLData(self))
@@ -83,53 +85,56 @@ class SimulatorRL:
         self.agent.enable_training()
         return ret
 
-    def _train_sb3(self):
-        logger.info(f"[{self.experiment_id}] Delegating training to SB3 agent.learn")
+    def _train_sb3(self, finalize: bool = True):
         sb_callbacks = []
-        
+
         if self.num_episodes is not None:
-            # Episode-based stopping
-            max_episode_callback = StopTrainingOnMaxEpisodes(
-                max_episodes=self.num_episodes // self.n_env, 
-                verbose=0
-            )
-            sb_callbacks.append(max_episode_callback)
-            total_timesteps = 4242424242424  # Arbitrarily large
+            sb_callbacks.append(StopTrainingOnMaxEpisodes(
+                max_episodes=self.num_episodes // self.n_env, verbose=0
+            ))
+            total_timesteps = 4242424242424
         else:
-            # Timestep-based stopping
             total_timesteps = self.num_timesteps
-        
+
         for callback in self.callbacks:
-            sb_callbacks.append(SB3CallbackAdapter(callback))
-        
+            adapted = SB3CallbackAdapter(callback)
+            adapted.finalize = finalize   # ← pass the flag down
+            sb_callbacks.append(adapted)
+
         model = self.agent.stable_baselines_unwrapped()
-        model.learn(total_timesteps=total_timesteps, callback=sb_callbacks)
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=sb_callbacks,
+            reset_num_timesteps=not getattr(self, "_already_trained", False),
+        )
+        self._already_trained = True
 
     def _env_interaction(
-        self, 
+        self,
         num_episodes: Optional[int] = None,
-        num_timesteps: Optional[int] = None
+        num_timesteps: Optional[int] = None,
+        finalize: bool = True
     ) -> Tuple[float, float]:
         """
         Returns the mean and variance of episode returns.
-        
+
         Stops when either num_episodes or num_timesteps limit is reached.
         """
         # Use instance variables if not provided
         if num_episodes is None and num_timesteps is None:
             num_episodes = self.num_episodes
             num_timesteps = self.num_timesteps
-        
+
         stop_on_episodes = num_episodes is not None
         stop_on_timesteps = num_timesteps is not None
-        
+
         log_msg = f"[{self.experiment_id}] Running custom loop: "
         if stop_on_episodes:
             log_msg += f"total_episodes={num_episodes}"
         if stop_on_timesteps:
             log_msg += f"total_timesteps={num_timesteps}"
         logger.info(log_msg)
-        
+
         self._call_callbacks("on_training_start")
         n_env = self.env_manager.n_envs
         episodes_finished = 0
@@ -147,11 +152,12 @@ class SimulatorRL:
                     break
                 if stop_on_timesteps and timesteps_finished >= num_timesteps:
                     break
-                
+
                 self._call_callbacks("on_rollout_start")
                 actions = self.agent.choose_action(obs)
-                next_obs, rewards, dones, infos = self.env_manager.step(actions)
-                
+                next_obs, rewards, dones, infos = self.env_manager.step(
+                    actions)
+
                 ep_return += rewards
                 timesteps_finished += n_env
 
@@ -169,7 +175,8 @@ class SimulatorRL:
                                             done=dones):
                     break
 
-                self.agent.store_transition(obs, actions, rewards, next_obs, dones)
+                self.agent.store_transition(
+                    obs, actions, rewards, next_obs, dones)
                 self.agent.update()
                 if self.agent.full_buffer():
                     self._call_callbacks("on_rollout_end")
@@ -184,15 +191,19 @@ class SimulatorRL:
         except StopIteration:
             logger.info(f"[{self.experiment_id}] Early stopping triggered!")
         except KeyboardInterrupt:
-            logger.info(f"[{self.experiment_id}] Training interrupted by user!")
+            logger.info(
+                f"[{self.experiment_id}] Training interrupted by user!")
         except SystemExit:
-            logger.info(f"[{self.experiment_id}] SystemExit received, stopping training!")
+            logger.info(
+                f"[{self.experiment_id}] SystemExit received, stopping training!")
         except Exception as e:
-            logger.info(f"[{self.experiment_id}] Other error: {e}, returning zeros for mean and variance.")
+            logger.info(
+                f"[{self.experiment_id}] Other error: {e}, returning zeros for mean and variance.")
             episode_returns = []
 
-        self._call_callbacks("on_training_end")
-        self.env_manager.close()
+        if finalize:
+            self._call_callbacks("on_training_end")
+            self.env_manager.close()
 
         if len(episode_returns) == 0:
             return {"mean_return": 0.0, "std_return": 0.0}
@@ -221,10 +232,13 @@ def main(cfg: DictConfig):
     for run_idx in range(1):
         logger.start()
         info_env = gym.make(cfg.environment)
-        env_manager = EnvManager(env_fn=lambda: gym.make(cfg.environment), n_envs=1, use_subproc=True, norm_obs=True)
-        agent = AgentFactory.create_agent(cfg.agent.agent_type, info_env, 1, OmegaConf.to_container(cfg.agent.agent_params, resolve=True))
+        env_manager = EnvManager(env_fn=lambda: gym.make(
+            cfg.environment), n_envs=1, use_subproc=True, norm_obs=True)
+        agent = AgentFactory.create_agent(cfg.agent.agent_type, info_env, 1, OmegaConf.to_container(
+            cfg.agent.agent_params, resolve=True))
         sim = SimulatorRL(env_manager, agent)
         sim.train(num_episodes=cfg.num_episodes)
+
 
 if __name__ == '__main__':
     main()

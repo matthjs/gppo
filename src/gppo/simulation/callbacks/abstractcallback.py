@@ -18,6 +18,7 @@ class AbstractCallback(ABC):
         self.num_steps = 0
         self.num_episodes = 0
         self.old_obs = None
+        self.finalize = True
 
     def init_callback(self, data: SimulatorRLData) -> None:
         pass

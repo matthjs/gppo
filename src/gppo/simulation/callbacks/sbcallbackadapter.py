@@ -21,6 +21,7 @@ class SB3CallbackAdapter(BaseCallback):
     def __init__(self, callback: AbstractCallback, verbose: int = 0):
         super().__init__(verbose=verbose)
         self.callback = callback
+        self.finalize = True
 
     def _on_training_start(self) -> None:
         self.callback.on_training_start()
@@ -33,9 +34,10 @@ class SB3CallbackAdapter(BaseCallback):
         done = self.locals.get("dones", None)
 
         # Call the wrapped callback
-        continue_training = self.callback.on_step(action, reward, next_obs, done)
+        continue_training = self.callback.on_step(
+            action, reward, next_obs, done)
         return continue_training
-    
+
     def on_rollout_start(self) -> None:
         self.callback.on_rollout_start()
         # A bit hacky but we will haave to do this for now.
@@ -54,7 +56,7 @@ class SB3CallbackAdapter(BaseCallback):
         """
         # Collect learning info from SB3
         self.callback.on_rollout_end()
-            # self.callback.on_learn(learning_info)
+        # self.callback.on_learn(learning_info)
 
     def _on_training_end(self) -> bool:
         # Called after every gradient update (learning step)
@@ -62,8 +64,10 @@ class SB3CallbackAdapter(BaseCallback):
         # print("Learning update finished!")
         # self.callback.on_learn({})
         # if isinstance(self.callback, TimeBudgetCallback):
-            # A bit hacky but we will haave to do this for now.
+        # A bit hacky but we will haave to do this for now.
         #    self.callback.on_training_end()
+        if self.finalize:
+            self.callback.on_training_end()
         return True
 
     # def _on_training_end(self) -> None:

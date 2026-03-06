@@ -12,7 +12,9 @@ from gppo.agents.randomagent import RandomAgent
 from gppo.agents.ppoagent import PPOAgent
 from gppo.agents.sbadapter import StableBaselinesAdapter
 from gppo.util.resolve import resolve_optimizer_cls
-
+from hydra.utils import instantiate
+from hydra._internal.utils import _locate
+from omegaconf import OmegaConf
 
 class AgentFactory:
     """
@@ -96,6 +98,14 @@ class AgentFactory:
             "device": device
         })
 
+        # For SB3: Custom feature extractor
+        # TODO: Maybe make this independent of Hydra
+        if "policy_kwargs" in agent_params:
+            pk = agent_params["policy_kwargs"]
+            if "features_extractor_class" in pk:
+                target = pk["features_extractor_class"]["_target_"]
+                pk["features_extractor_class"] = _locate(target)
+
         agent = None
         if agent_type == "DQN":
             # This looks like syntactic nonsense, but basically we want to overwrite the class
@@ -142,10 +152,13 @@ class AgentFactory:
             if optimizer_cfg:
                 opt_cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
                 kwargs.pop("lr", None)
-                agent_params["policy_kwargs"] = {
+                # Merge into existing policy_kwargs instead of overwriting
+                if "policy_kwargs" not in agent_params:
+                    agent_params["policy_kwargs"] = {}
+                agent_params["policy_kwargs"].update({
                     "optimizer_class": opt_cls,
                     "optimizer_kwargs": kwargs
-                }
+                })
             agent = StableBaselinesAdapter(PPO(**agent_params))
         elif agent_type == "SB_DQN":
             agent_params.update({
@@ -154,10 +167,13 @@ class AgentFactory:
             if optimizer_cfg:
                 opt_cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
                 kwargs.pop("lr", None)
-                agent_params["policy_kwargs"] = {
+                # Merge into existing policy_kwargs instead of overwriting
+                if "policy_kwargs" not in agent_params:
+                    agent_params["policy_kwargs"] = {}
+                agent_params["policy_kwargs"].update({
                     "optimizer_class": opt_cls,
                     "optimizer_kwargs": kwargs
-                }
+                })
             agent = StableBaselinesAdapter(DQN(**agent_params))
         elif agent_type == "RANDOM":
             agent = RandomAgent(action_space)
