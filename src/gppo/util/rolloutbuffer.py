@@ -37,6 +37,15 @@ class RolloutBuffer:
         self.log_probs = torch.zeros(capacity, dtype=torch.float32, device=device)
         self.advantages = torch.zeros(capacity, dtype=torch.float32, device=device)
         self.returns = torch.zeros(capacity, dtype=torch.float32, device=device)
+        self.logits = None   # if needed
+
+    def set_logit_buffer(self, dim: int) -> None:
+        """
+        This only makes sense for discrete actions and is used with the CLEAR algorithm
+
+        :param dim: reflects the number of actions
+        """
+        self.logits = torch.zeros((self.capacity, dim), dtype=torch.float32, device=self.device)
 
     def push(
         self,
@@ -46,6 +55,7 @@ class RolloutBuffer:
         done: Union[Tensor, np.ndarray],
         log_prob: Union[Tensor, np.ndarray] = None,
         value: Union[Tensor, np.ndarray] = None,
+        logits: Union[Tensor, np.ndarray] = None
     ) -> None:
         """
         Add a transition to the buffer.
@@ -60,6 +70,8 @@ class RolloutBuffer:
         :param log_prob: Log-probability of action.
         :param value: Estimated value of state.
         """
+        if logits is not None and self.logits is None:
+            raise ValueError("You must set the logit buffer yourself to push logits")
         n_envs = reward.shape[0]
         idxs = slice(self.pos, self.pos + n_envs)
         
@@ -69,6 +81,8 @@ class RolloutBuffer:
         self.dones[idxs] = ensure_tensor(done, torch.float32, self.device)
         self.values[idxs] = ensure_tensor(value, torch.float32, self.device)
         self.log_probs[idxs] = ensure_tensor(log_prob, torch.float32, self.device)
+
+        self.logits[idxs] = ensure_tensor(logits, torch.float32, self.device)
 
         self.pos += n_envs
 

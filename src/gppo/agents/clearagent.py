@@ -1,6 +1,5 @@
 
 from __future__ import annotations
-from gppo.agents.onpolicyagent import OnPolicyAgent
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,12 +7,9 @@ from typing import Dict, Any, Optional
 from torch.nn import functional as F
 from gppo.agents.ppoagent import PPOAgent
 from gppo.util.clearreplaybuffer import ClearReplayBuffer, dump_rollout_to_replay
-from gppo.util.network import ActorCriticMLP, ActorCriticCNN
-from gppo.util.resolve import resolve_optimizer_cls
-from gppo.util.rolloutbuffer import RolloutBuffer
 import torch
 import numpy as np
-from typing import Optional, Tuple, Union, Generator
+from typing import Optional, Tuple
 
 class CLEARAgent(PPOAgent):
     """
@@ -127,6 +123,10 @@ class CLEARAgent(PPOAgent):
 
         # CLEAR replay buffer
         action_dim = int(np.prod(action_dimensions))
+        # Logit management
+        self.last_logits = None
+        self.rollout_buffer.set_logit_buffer(action_dim)
+
         self.replay_buffer = ClearReplayBuffer(
             capacity=replay_buffer_capacity,
             obs_shape=state_dimensions,
@@ -138,6 +138,45 @@ class CLEARAgent(PPOAgent):
 
         if self.torch_compile:
             self._compute_clear_loss = torch.compile(self._compute_clear_loss)
+
+    def choose_action(self, observation: np.ndarray) -> Any:
+        self.policy.eval()
+        with torch.no_grad():
+            # Support both single and parallel environments
+            state = torch.tensor(
+                observation, dtype=torch.float32, device=self.device)    # [n_env, dim]
+            dist, value, _ = self.policy(state)    # value: [n_env]
+            action = dist.sample()    # [n_env, dim]
+            # Categorical log_prob is already scalar per sample; Normal needs summing over action dims
+            lp = dist.log_prob(action)
+            log_prob = lp if lp.dim() == 1 else lp.sum(dim=-1)    # log_prob: [n_env]
+            self.last_log_prob = log_prob
+            self.last_value = value
+            # Buffer expects [n_envs, action_dim]; Categorical samples [n_envs] so unsqueeze
+            if self.discrete:
+                action = action.unsqueeze(-1)
+                self.last_logits = dist.logits    # <--- added
+            return action.cpu().numpy()
+
+    def store_transition(
+            self,
+            state: np.ndarray,
+            action: Any,
+            reward: float,
+            new_state: np.ndarray,
+            done: bool,
+    ) -> None:
+        self.next_state = new_state
+        self.last_done = done
+        self.rollout_buffer.push(
+            state,
+            action,
+            reward,
+            done,
+            self.last_log_prob.detach(),
+            self.last_value.detach(),
+            self.last_logits.detach() if self.discrete else None   # <--- added
+        )
 
     @staticmethod
     def _compute_clear_loss(

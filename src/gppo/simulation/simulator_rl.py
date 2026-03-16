@@ -1,4 +1,5 @@
 import logging
+import traceback
 from typing import Any, Dict, List, Optional, Tuple
 import gymnasium as gym
 import numpy as np
@@ -197,8 +198,10 @@ class SimulatorRL:
             logger.info(
                 f"[{self.experiment_id}] SystemExit received, stopping training!")
         except Exception as e:
-            logger.info(
-                f"[{self.experiment_id}] Other error: {e}, returning zeros for mean and variance.")
+            logger.error(
+                f"[{self.experiment_id}] Other error: {e}\n"
+                f"{traceback.format_exc()}"   # <-- full traceback with line numbers
+            )
             episode_returns = []
 
         if finalize:

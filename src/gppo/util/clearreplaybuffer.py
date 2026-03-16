@@ -38,13 +38,13 @@ class ClearReplayBuffer:
 
     Stores:
         obs       : [capacity, *obs_shape]          s_t
-        next_obs  : [capacity, *obs_shape]          s_{t+1}  ← V-trace bootstrap
+        next_obs  : [capacity, *obs_shape]          s_{t+1}  <- V-trace bootstrap
         actions   : [capacity, *action_shape]
         rewards   : [capacity]
         dones     : [capacity]
         log_probs : [capacity]   log μ(a|s)
-        values    : [capacity]   V_μ(s)             ← BC value loss only
-        logits    : [capacity, action_dim]           ← BC KL loss, discrete only
+        values    : [capacity]   V_μ(s)              <- BC value loss only
+        logits    : [capacity, action_dim]            <- BC KL loss, discrete only
     """
 
     def __init__(
@@ -53,13 +53,13 @@ class ClearReplayBuffer:
         obs_shape:    Tuple[int, ...],
         action_shape: Tuple[int, ...],
         action_dim:   int,
-        discrete:     bool,              # ← added
+        discrete:     bool,
         device:       torch.device,
     ):
         self.capacity   = capacity
         self.device     = device
         self.action_dim = action_dim
-        self.discrete   = discrete       # ← added
+        self.discrete   = discrete
 
         self._size:       int = 0
         self._total_seen: int = 0
@@ -143,7 +143,7 @@ class ClearReplayBuffer:
             idx = j
 
         self.obs[idx]       = obs
-        self.next_obs[idx]  = next_obs  # ← added
+        self.next_obs[idx]  = next_obs
         self.actions[idx]   = action
         self.rewards[idx]   = reward
         self.dones[idx]     = done
@@ -157,7 +157,7 @@ def dump_rollout_to_replay(
     replay,
 ) -> None:
     """
-    Transfer all stored transitions from a RolloutBuffer into a ClearReplayBuffer.
+    Transfer all stored transitions from a RolloutBuffer into a (Clear)ReplayBuffer.
 
     Observations are shifted by one to produce (obs, next_obs) pairs.
     The final next_obs is a zero tensor (terminal / unknown bootstrap state).
@@ -174,6 +174,7 @@ def dump_rollout_to_replay(
     dones   = rollout.dones[:n]         # [n]
     values  = rollout.values[:n]        # [n]
     log_probs = rollout.log_probs[:n]   # [n]
+    logits = rollout.logits[:n] if rollout.logits is not None else None   # Change to getter?
 
     # Build next_obs by shifting observations forward by one step.
     # For the final step, next_obs is zeroed (terminal / unavailable).
@@ -192,7 +193,7 @@ def dump_rollout_to_replay(
         done=dones,
         log_prob=log_probs,
         value=values,
-        logits=None,         # no logits stored in the rollout buffer
+        logits=logits,
     )
 
 """
