@@ -2,6 +2,7 @@ import logging
 import pathlib
 import wandb
 import numpy as np
+import tqdm
 from typing import Optional, Dict, Any, List
 from gppo.simulation.callbacks.abstractcallback import AbstractCallback
 from gppo.simulation.simulatorldata import SimulatorRLData
@@ -29,6 +30,7 @@ class WandbStepCallback(AbstractCallback):
         verbose: int = logging.INFO,
         plot_dir: str = None,
         log_step_frequency: int = 1,
+        enable_wandb: bool = True,
         
         # Evaluation settings
         eval_env_manager: Optional[Any] = None,
@@ -45,6 +47,7 @@ class WandbStepCallback(AbstractCallback):
         self.config = config or {}
         self.plot_dir = pathlib.Path(plot_dir) if plot_dir else None
         self.log_step_frequency = log_step_frequency
+        self.enable_wandb = enable_wandb
         
         # Evaluation settings
         self.eval_env_manager = eval_env_manager
@@ -66,6 +69,7 @@ class WandbStepCallback(AbstractCallback):
         self.eval_episode_lengths = []
         self.total_eval_episodes = 0
         self.last_eval_step = 0
+        self.latest_eval_return = None
         
         # Statistics
         self.train_step_rewards_history = []
@@ -73,6 +77,7 @@ class WandbStepCallback(AbstractCallback):
         
         self.agent = None
         self.run = None
+        self.pbar = None
         logger.setLevel(verbose)
 
     def init_callback(self, data: SimulatorRLData):
@@ -86,7 +91,7 @@ class WandbStepCallback(AbstractCallback):
         if self.do_evaluation:
             logger.info(f"Evaluation enabled: every {self.eval_frequency} steps, {self.eval_episodes} episodes")
         
-        if self.run is None:
+        if self.enable_wandb and self.run is None:
             self.run = wandb.init(
                 project=self.project,
                 entity=self.entity,
@@ -101,11 +106,16 @@ class WandbStepCallback(AbstractCallback):
             f"(project={self.project}, group={self.group})"
         )
 
+        self.pbar = tqdm.tqdm(desc="Training", unit="steps")
+
     def on_step(self, action, reward, next_obs, done) -> bool:
         """Handle training step-level logging and periodic evaluation."""
         super().on_step(action, reward, next_obs, done)
         
         self.total_train_timesteps += self.n_env
+
+        if self.pbar is not None:
+            self.pbar.update(self.n_env)
         
         # Handle training metrics
         if isinstance(reward, np.ndarray):
@@ -139,11 +149,21 @@ class WandbStepCallback(AbstractCallback):
             self._run_evaluation()
             self.last_eval_step = self.total_train_timesteps
         
+        if self.pbar is not None:
+            postfix = {
+                "ep_reward": np.mean(self.train_completed_returns[-10:]) if self.train_completed_returns else 0,
+                "episodes": self.train_episodes_finished
+            }
+
+            if self.latest_eval_return is not None:
+                postfix["eval_return"] = f"{self.latest_eval_return:.2f}"
+
+            self.pbar.set_postfix(postfix)
+        
         return True
 
     def _run_evaluation(self):
         """Run evaluation for specified number of episodes."""
-        logger.info(f"Running evaluation at step {self.total_train_timesteps}...")
         
         eval_episode_returns = []
         eval_episode_lengths = []
@@ -155,16 +175,12 @@ class WandbStepCallback(AbstractCallback):
             episode_length = 0
             
             while not done:
-                # Get action from agent (deterministic for eval)
                 action = self.agent.choose_action(obs)
-                
-                # Step environment
                 obs, reward, done, info = self.eval_env_manager.step(action)
                 
                 episode_return += reward if not isinstance(reward, np.ndarray) else np.sum(reward)
                 episode_length += 1
                 
-                # Handle vectorized env
                 if isinstance(done, np.ndarray):
                     done = done[0]
             
@@ -172,11 +188,11 @@ class WandbStepCallback(AbstractCallback):
             eval_episode_lengths.append(episode_length)
             self.total_eval_episodes += 1
         
-        # Store results
         self.eval_completed_returns.extend(eval_episode_returns)
         self.eval_episode_lengths.extend(eval_episode_lengths)
+
+        self.latest_eval_return = np.mean(eval_episode_returns)
         
-        # Log evaluation metrics
         eval_metrics = {
             f"{self.eval_log_prefix}timestep": self.total_train_timesteps,
             f"{self.eval_log_prefix}mean_return": np.mean(eval_episode_returns),
@@ -185,12 +201,8 @@ class WandbStepCallback(AbstractCallback):
             f"{self.eval_log_prefix}total_episodes": self.total_eval_episodes,
         }
         
-        wandb.log(eval_metrics, step=self.total_train_timesteps)
-        
-        logger.info(
-            f"Evaluation complete: mean_return={np.mean(eval_episode_returns):.2f}, "
-            f"episodes={len(eval_episode_returns)}"
-        )
+        if self.enable_wandb:
+            wandb.log(eval_metrics, step=self.total_train_timesteps)
 
     def _handle_train_episode_completion(self, env_idx: int):
         """Handle completion of an episode in training environment."""
@@ -208,7 +220,9 @@ class WandbStepCallback(AbstractCallback):
             "train_episode_length": episode_length,
             "train_timestep": self.total_train_timesteps,
         }
-        wandb.log(train_episode_metrics, step=self.total_train_timesteps)
+
+        if self.enable_wandb:
+            wandb.log(train_episode_metrics, step=self.total_train_timesteps)
         
         logger.debug(
             f"Train episode {self.train_episodes_finished} finished in env {env_idx} "
@@ -223,19 +237,16 @@ class WandbStepCallback(AbstractCallback):
             "train_timestep": self.total_train_timesteps,
             "train_avg_step_reward": avg_reward,
             "train_episodes_finished": self.train_episodes_finished,
-            # "train_avg_ongoing_return": np.mean(self.train_episode_returns),
         }
-        
-        # for i in range(self.n_env):
-        #    step_metrics[f"train_env_{i}_ongoing_return"] = self.train_episode_returns[i]
-        
-        wandb.log(step_metrics, step=self.total_train_timesteps)
+
+        if self.enable_wandb:
+            wandb.log(step_metrics, step=self.total_train_timesteps)
 
     def on_learn(self, learning_info: Dict[str, Any]):
         """Log learning metrics from agent updates."""
         super().on_learn(learning_info)
         
-        if learning_info:
+        if learning_info and self.enable_wandb:
             learning_info_with_step = learning_info.copy()
             learning_info_with_step["train_timestep"] = self.total_train_timesteps
             wandb.log(learning_info_with_step, step=self.total_train_timesteps)
@@ -245,7 +256,6 @@ class WandbStepCallback(AbstractCallback):
         super().on_training_end()
         
         if self.finalize:
-            # Run final evaluation
             if self.do_evaluation:
                 logger.info("Running final evaluation...")
                 self._run_evaluation()
@@ -254,8 +264,13 @@ class WandbStepCallback(AbstractCallback):
             self._log_final_stats()
             self._log_plots()
             self._log_summary_csv()
+
+            if self.pbar is not None:
+                self.pbar.close()
             
-            wandb.finish()
+            if self.enable_wandb:
+                wandb.finish()
+
             logger.info("WandbStepCallback training ended and WandB run closed.")
 
     def _log_final_stats(self):
@@ -277,12 +292,15 @@ class WandbStepCallback(AbstractCallback):
                 "final/eval_total_episodes": self.total_eval_episodes,
             })
         
-        if final_stats:
+        if final_stats and self.enable_wandb:
             wandb.log(final_stats, step=self.total_train_timesteps)
 
     def _log_plots(self):
         """Log plot files to WandB."""
         if not self.plot_dir or not self.plot_dir.exists():
+            return
+
+        if not self.enable_wandb:
             return
 
         for ext in ("*.png", "*.svg", "*.pdf"):
@@ -294,6 +312,8 @@ class WandbStepCallback(AbstractCallback):
         """Create and log summary CSVs."""
         import pandas as pd
         import tempfile
+        if not self.enable_wandb:
+            return
         
         if self.train_completed_returns:
             df_train = pd.DataFrame({

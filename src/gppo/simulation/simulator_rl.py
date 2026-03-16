@@ -98,7 +98,7 @@ class SimulatorRL:
 
         for callback in self.callbacks:
             adapted = SB3CallbackAdapter(callback)
-            adapted.finalize = finalize   # ← pass the flag down
+            adapted.finalize = finalize
             sb_callbacks.append(adapted)
 
         model = self.agent.stable_baselines_unwrapped()

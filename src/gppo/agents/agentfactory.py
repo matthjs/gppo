@@ -3,6 +3,7 @@ import gymnasium as gym
 from stable_baselines3 import DQN, PPO
 import torch
 from gppo.agents.agent import Agent
+from gppo.agents.clearagent import CLEARAgent
 from gppo.agents.ddqnagent import DDQNAgent
 from gppo.agents.dqnagent import DQNAgent
 from gppo.agents.dqvagent import DQVAgent
@@ -121,12 +122,47 @@ class AgentFactory:
         elif agent_type == "DQV-Max":
             agent = DQVMaxAgent(**agent_params) if not agent_params['dueling_architecture'] else \
                 type("DQVMaxAgent", (DQVMaxAgent,), {})(**agent_params)
+        elif agent_type == "CLEAR":
+            agent_params.update({
+                "state_dimensions": obs_space.shape,
+                "action_dimensions": (action_space.n,) if hasattr(action_space, "n") else action_space.shape,
+                "discrete": agent_params.pop("discrete", hasattr(action_space, "n")),
+                "n_envs": n_envs,
+            })
+
+            policy_kwargs = agent_params.pop("policy_kwargs", {})
+
+            if "features_extractor_class" in policy_kwargs:
+                extractor_cls = policy_kwargs["features_extractor_class"]
+
+                # Hydra may have already resolved it
+                if isinstance(extractor_cls, dict):
+                    extractor_cls = _locate(extractor_cls["_target_"])
+
+                agent_params["features_extractor_class"] = extractor_cls
+                agent_params["features_extractor_kwargs"] = policy_kwargs.get(
+                    "features_extractor_kwargs", {}
+                )
+
+            if optimizer_cfg:
+                agent_params["optimizer_cfg"] = optimizer_cfg
+
+            agent = CLEARAgent(**agent_params)
         elif agent_type == "PPO":
             agent_params.update({
                 "state_dimensions": obs_space.shape,
-                "action_dimensions": action_space.shape,
-                "n_envs": n_envs
+                "action_dimensions": (action_space.n,) if hasattr(action_space, "n") else action_space.shape,
+                "discrete": agent_params.pop("discrete", hasattr(action_space, "n")),
+                "n_envs": n_envs,
             })
+            policy_kwargs = agent_params.pop("policy_kwargs", {})
+            if "features_extractor_class" in policy_kwargs:
+                extractor_cls = policy_kwargs["features_extractor_class"]
+                # Hydra may have already resolved the class, or it may still be a _target_ dict
+                if isinstance(extractor_cls, dict):
+                    extractor_cls = _locate(extractor_cls["_target_"])
+                agent_params["features_extractor_class"] = extractor_cls
+                agent_params["features_extractor_kwargs"] = policy_kwargs.get("features_extractor_kwargs", {})
             agent = PPOAgent(**agent_params)
         elif agent_type == "GPPO":
             agent_params.update({

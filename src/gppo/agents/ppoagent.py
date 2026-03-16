@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, Any, Optional
 from torch.nn import functional as F
-from gppo.util.network import ActorCriticMLP
+from gppo.util.network import ActorCriticMLP, ActorCriticCNN
 from gppo.util.resolve import resolve_optimizer_cls
 
 
@@ -16,7 +16,10 @@ class PPOAgent(OnPolicyAgent):
     """
     Implementation of PPO with support for parallel environment execution.
 
-    Note: Does not support discrete action spaces.
+    Supports both continuous and discrete action spaces. For image-based observations
+    (e.g. Minigrid), pass a `features_extractor_class` via `features_extractor_class`
+    and `features_extractor_kwargs` to inject a custom CNN backbone, mirroring SB3's
+    policy_kwargs pattern.
     """
 
     def __init__(
@@ -38,6 +41,9 @@ class PPOAgent(OnPolicyAgent):
             device: torch.device = torch.device("cpu"),
             torch_compile: bool = False,
             optimizer_cfg: dict = None,
+            features_extractor_class=None,
+            features_extractor_kwargs: dict = None,
+            discrete: bool = False,
             **kwargs
     ):
         """
@@ -57,7 +63,23 @@ class PPOAgent(OnPolicyAgent):
         :param vf_coef: Value function coefficient for the loss calculation (c_2).
         :param max_grad_norm: The maximum value for the gradient clipping
         :param device: Device.
+        :param torch_compile: Whether to compile the policy with torch.compile.
+        :param optimizer_cfg: Optional optimizer config dict (resolved via resolve_optimizer_cls).
+        :param features_extractor_class: Optional CNN feature extractor class. Must expose a
+        `features_dim: int` attribute. When provided, ActorCriticCNN is used as the policy;
+        otherwise ActorCriticMLP is used. Mirrors SB3's policy_kwargs["features_extractor_class"].
+        :param features_extractor_kwargs: Keyword arguments passed to features_extractor_class.__init__.
+        :param discrete: Whether the action space is discrete. Applies to both MLP and CNN policies:
+        uses a Categorical distribution when True, Gaussian when False.
         """
+        # For discrete actions the network needs the number of logits (n_actions),
+        # but the buffer stores scalar indices so its action_shape must be (1,).
+        # action_dimensions from the factory is (n_actions,) for Discrete spaces,
+        # so we extract the true logit count before super().__init__ builds the buffer.
+        action_dim = int(np.prod(action_dimensions))
+        if discrete:
+            action_dimensions = (1,)  # buffer stores scalar action indices, not one-hot
+
         super().__init__(
             n_steps * n_envs,
             state_dimensions,
@@ -70,13 +92,31 @@ class PPOAgent(OnPolicyAgent):
 
         self.n_steps = n_steps
         self.n_envs = n_envs
+        self.discrete = discrete  # store on agent directly — policy may be wrapped by torch.compile
 
-        input_dim = int(np.prod(state_dimensions))
-        action_dim = int(np.prod(action_dimensions))
-        self.policy = ActorCriticMLP(
-            input_dim=input_dim,
-            action_dim=action_dim,
-        ).to(self.device)
+        if features_extractor_class is not None:
+            extractor_kwargs = dict(features_extractor_kwargs or {})
+            # observation_space cannot come from static config — build a minimal Box from
+            # state_dimensions and inject it if the caller hasn't already provided it.
+            if "observation_space" not in extractor_kwargs:
+                import gymnasium as gym
+                extractor_kwargs["observation_space"] = gym.spaces.Box(
+                    low=0, high=255, shape=state_dimensions, dtype=np.uint8
+                )
+            extractor = features_extractor_class(**extractor_kwargs)
+            self.policy = ActorCriticCNN(
+                features_extractor=extractor,
+                action_dim=action_dim,
+                discrete=discrete,
+            ).to(self.device)
+        else:
+            input_dim = int(np.prod(state_dimensions))
+            self.policy = ActorCriticMLP(
+                input_dim=input_dim,
+                action_dim=action_dim,
+                discrete=discrete,
+            ).to(self.device)
+
         self.torch_compile = torch_compile
         if self.torch_compile:
             self.policy = torch.compile(self.policy)
@@ -84,7 +124,7 @@ class PPOAgent(OnPolicyAgent):
         self.optimizer = None
         if optimizer_cfg:
             cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
-            self.optimizer = cls(self.parameters(), **kwargs)
+            self.optimizer = cls(self.policy.parameters(), **kwargs)
         else:
             self.optimizer = torch.optim.Adam(self.policy.parameters(),
                                 lr=self.learning_rate)
@@ -112,10 +152,14 @@ class PPOAgent(OnPolicyAgent):
                 observation, dtype=torch.float32, device=self.device)    # [n_env, dim]
             dist, value, _ = self.policy(state)    # value: [n_env]
             action = dist.sample()    # [n_env, dim]
-            log_prob = dist.log_prob(action).sum(
-                dim=-1)   # log_prob: [n_env]
+            # Categorical log_prob is already scalar per sample; Normal needs summing over action dims
+            lp = dist.log_prob(action)
+            log_prob = lp if lp.dim() == 1 else lp.sum(dim=-1)    # log_prob: [n_env]
             self.last_log_prob = log_prob
             self.last_value = value
+            # Buffer expects [n_envs, action_dim]; Categorical samples [n_envs] so unsqueeze
+            if self.discrete:
+                action = action.unsqueeze(-1)
             return action.cpu().numpy()
 
     def store_transition(
@@ -212,8 +256,12 @@ class PPOAgent(OnPolicyAgent):
             for states, actions, old_log_probs, returns, advantages in self.rollout_buffer.get(self.batch_size):
                 cnt += 1
                 dist, values, _ = self.policy(states)
-                log_probs = dist.log_prob(actions).sum(dim=-1, keepdim=True)
-                entropy_loss = -dist.entropy().sum(dim=-1).mean()  # Sum over actions before mean
+                # Categorical expects [B], Normal expects [B, action_dim] — squeeze stored [B, 1] for discrete
+                _actions = actions.squeeze(-1) if self.discrete else actions
+                lp = dist.log_prob(_actions)
+                log_probs = (lp if lp.dim() == 1 else lp.sum(dim=-1)).unsqueeze(-1)
+                entropy_loss = -dist.entropy().mean() if self.discrete \
+                    else -dist.entropy().sum(dim=-1).mean()  # Sum over actions before mean
 
                 loss, policy_loss, value_loss = self._compute_ppo_loss(
                     log_probs, old_log_probs, advantages, returns,
@@ -259,6 +307,6 @@ class PPOAgent(OnPolicyAgent):
         }, path)
 
     def load(self, path: str) -> None:
-        checkpoint = torch.load(path, map_location=self.device)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
         self.policy.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])

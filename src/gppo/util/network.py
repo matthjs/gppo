@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional
 import torch
 from torch.distributions import Categorical, Normal
 import torch.nn as nn
@@ -178,7 +178,7 @@ class ActorCriticMLP(nn.Module):
             return Normal(mean, std), value, self.action_log_std
 
 
-class ActorCriticCNN(nn.Module):
+class ActorCriticCNNOld(nn.Module):
     """
     CNN-based Actor-Critic for image-based observation spaces.
     Reuses the convolutional feature extractor from ConvNetEstimator,
@@ -245,5 +245,47 @@ class ActorCriticCNN(nn.Module):
             return dist, value, None
         else:
             mean = self.action_mean(x)
+            std = torch.exp(self.action_log_std)
+            return Normal(mean, std.expand_as(mean)), value, self.action_log_std
+
+
+class ActorCriticCNN(nn.Module):
+    """
+    CNN-based Actor-Critic that accepts any feature extractor module.
+    The extractor must expose a `features_dim: int` attribute.
+    """
+    def __init__(
+            self,
+            features_extractor: nn.Module,
+            action_dim: int,
+            ortho_init: bool = True,
+            discrete: bool = False,
+    ):
+        super().__init__()
+        self.discrete = discrete
+        self.feature_extractor = features_extractor
+        features_dim = features_extractor.features_dim
+
+        self.action_head = nn.Linear(features_dim, action_dim)
+        self.value_head = nn.Linear(features_dim, 1)
+
+        if not discrete:
+            self.action_log_std = nn.Parameter(torch.zeros(1, action_dim))
+
+        if ortho_init:
+            nn.init.orthogonal_(self.action_head.weight, gain=0.01)
+            nn.init.zeros_(self.action_head.bias)
+            nn.init.orthogonal_(self.value_head.weight, gain=1.0)
+            nn.init.zeros_(self.value_head.bias)
+
+    def forward(self, state) -> Tuple[Any, torch.Tensor, Optional[torch.Tensor]]:
+        if isinstance(state, np.ndarray):
+            state = torch.tensor(state, dtype=torch.float32)
+        x = self.feature_extractor(state)
+        value = self.value_head(x).squeeze(-1)
+        if self.discrete:
+            return Categorical(logits=self.action_head(x)), value, None
+        else:
+            mean = self.action_head(x)
             std = torch.exp(self.action_log_std)
             return Normal(mean, std.expand_as(mean)), value, self.action_log_std
