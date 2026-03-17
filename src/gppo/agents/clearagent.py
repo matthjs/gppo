@@ -10,6 +10,7 @@ from gppo.util.clearreplaybuffer import ClearReplayBuffer, dump_rollout_to_repla
 import torch
 import numpy as np
 from typing import Optional, Tuple
+from itertools import cycle, repeat
 
 class CLEARAgent(PPOAgent):
     """
@@ -131,6 +132,9 @@ class CLEARAgent(PPOAgent):
             capacity=replay_buffer_capacity,
             obs_shape=state_dimensions,
             action_shape=action_dimensions,
+            # Each unroll will be the amount in the replaybuffer before
+            # clear
+            unroll_len=self.rollout_buffer.capacity,   # n_envs * n_steps !
             action_dim=action_dim if discrete else 0,   # --> for later, means do not allocate logits array
             discrete=discrete,
             device=device,
@@ -180,107 +184,72 @@ class CLEARAgent(PPOAgent):
 
     @staticmethod
     def _compute_clear_loss(
-        # replay batch
-        replay_obs:        torch.Tensor,   # [B, *obs]
-        replay_next_obs:   torch.Tensor,   # [B, *obs]
-        replay_actions:    torch.Tensor,   # [B, *act]
-        replay_log_probs_mu: torch.Tensor, # [B]   log μ(a|s)
-        replay_values_mu:  torch.Tensor,   # [B]   V_μ(s)
-        replay_logits_mu:  torch.Tensor,   # [B, A] raw logits of μ (discrete)
-        replay_rewards:    torch.Tensor,   # [B]
-        replay_dones:      torch.Tensor,   # [B]
-        # current policy
+        replay_obs: torch.Tensor,
+        replay_actions: torch.Tensor,
+        replay_log_probs_mu: torch.Tensor,
+        replay_returns: torch.Tensor,
+        replay_advantages: torch.Tensor,
+        replay_logits: torch.Tensor,
+
         policy,
-        # hyper-parameters
-        gamma:          float,
-        rho_bar:        float,
-        vf_coef:        float,
-        ent_coef:       float,
+
+        gamma: float,
+        rho_bar: float,
+        vf_coef: float,
+        ent_coef: float,
         bc_policy_coef: float,
-        bc_value_coef:  float,
-        discrete:       bool,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor,
-            torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Compute CLEAR losses for a minibatch of replay transitions (single-step, T=1).
-
-        Applied to replay data
-        ──────────────────────
-        L_pg       = −ρ_s · log π_θ(a_s|s_s) · (r_s + γ·v_{s+1} − V_θ(s_s))
-        L_value    = (V_θ(s_s) − v_s)²
-        L_entropy  = Σ_a π_θ(a|s) log π_θ(a|s)
-
-        Applied to replay data only
-        ───────────────────────────
-        L_policy_cloning = KL[μ(·|s) ‖ π_θ(·|s)]
-        L_value_cloning  = ‖V_θ(s) − V_μ(s)‖²
-
-        V-trace target for T=1 (trace product is empty = 1):
-        v_s = V(s) + ρ · (r + γ·V(s')·(1−d) − V(s))
-
-        :param replay_batch: Minibatch of replay transitions.
-        :type replay_batch: ReplayBatch
-
-        :return: total_loss, pg_loss, value_loss, entropy_loss, bc_policy_loss, bc_value_loss
-        :rtype: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
-        """
-        # ── forward passes ────────────────────────────────────────────── #
-        dist_s,  v_s,  _ = policy(replay_obs)       # π_θ(·|s),  V_θ(s)
-        dist_sp, v_sp, _ = policy(replay_next_obs)  # π_θ(·|s'), V_θ(s')
-        v_s  = v_s.squeeze(-1)                      # [B]
-        v_sp = v_sp.squeeze(-1)                     # [B]
-
+        bc_value_coef: float,
+        discrete: bool
+    ) -> tuple:
+        # get forward pass
+        dist_s, value_s, _ = policy(replay_obs)
+        
+        # not sure if I need to do this
+        # [B] -> [B, 1]
+        value_s = value_s.unsqueeze(-1)
+        # [B, 1] -> [B] if needed
         _actions = replay_actions.squeeze(-1) if discrete else replay_actions
-        lp = dist_s.log_prob(_actions)
-        lp = lp if lp.dim() == 1 else lp.sum(dim=-1)   # [B]
 
-        # ── IS ratio ρ = min(ρ̄, π_θ(a|s) / μ(a|s)) ───────────────────── #
-        rho = torch.exp(lp - replay_log_probs_mu).clamp( max=rho_bar).detach()
+        log_prob = dist_s.log_prob(_actions)
+        log_prob = (log_prob if log_prob.dim() == 1 else log_prob.sum(dim=-1)).unsqueeze(-1)
 
-        # ── 1-step V-trace target ─────────────────────────────────────── #
-        # v_s = V(s) + ρ · δ    where δ = r + γ·V(s')·(1−d) − V(s)
-        not_done = 1.0 - replay_dones
-        delta    = replay_rewards + gamma * v_sp.detach() * not_done - v_s.detach()
-        v_target = (v_s.detach() + rho * delta).detach()          # [B]
+        # IS ratio  ρ = min(ρ̄, π_θ(a|s) / μ(a|s))
+        # [B, 1]
+        rho = torch.exp(log_prob - replay_log_probs_mu).clamp(max=rho_bar).detach()
 
-        # ── v_{s+1} for the policy gradient advantage ─────────────────── #
-        # paper: r_s + γ·v_{s+1} − V_θ(s_s)
-        # for T=1, v_{s+1} ≈ V_θ(s') (no further trace to unroll)
-        advantage = (replay_rewards + gamma * v_sp.detach() * not_done
-                    - v_s.detach())                               # [B]
+        # policy gradient loss  −ρ · log π_θ(a|s) · advantage
+        policy_gradient_loss = (-rho * log_prob * replay_advantages.detach()).mean()
 
-        # ── L_policy-gradient = −ρ · log π_θ(a|s) · advantage ────────── #
-        pg_loss = -(rho * lp * advantage.detach()).mean()
+        # Value loss (V_θ(s) − v_s)²
+        value_loss = F.mse_loss(value_s, replay_returns)
 
-        # ── L_value = (V_θ(s) − v_s)² ────────────────────────────────── #
-        value_loss = F.mse_loss(v_s, v_target)
-
-        # ── L_entropy ─────────────────────────────────────────────────── #
         ent = dist_s.entropy()
         entropy_loss = -(ent.mean() if ent.dim() == 1 else ent.sum(dim=-1).mean())
 
-        # ── L_policy-cloning = KL[μ ‖ π_θ] (replay only) ─────────────── #
+        # L_policy-cloning = KL[μ ‖ π_θ] (replay only)
         if discrete:
             # Full KL using stored logits of μ
             # KL(μ‖π_θ) = Σ_a μ(a)[log μ(a) − log π_θ(a)]
-            log_mu = replay_logits_mu - torch.logsumexp(replay_logits_mu, dim=-1, keepdim=True)
+            log_mu = replay_logits - torch.logsumexp(replay_logits, dim=-1, keepdim=True)
             log_pi = dist_s.logits    - torch.logsumexp(dist_s.logits,    dim=-1, keepdim=True)
             mu_probs = log_mu.exp()
             bc_policy_loss = (mu_probs * (log_mu - log_pi)).sum(dim=-1).mean()
         else:
-            # Continuous: approximate via squared log-prob difference on taken action
-            bc_policy_loss = F.mse_loss(lp, replay_log_probs_mu.detach())
+            bc_policy_loss = F.mse_loss(log_prob, replay_log_probs_mu.detach())
 
-        # ── L_value-cloning = ‖V_θ(s) − V_μ(s)‖² (replay only) ──────── #
-        bc_value_loss = F.mse_loss(v_s, replay_values_mu.detach())
+        # L_value-cloning = ‖V_θ(s) − V_μ(s)‖² (replay only)
+        # Hacky way of reconstructing historical value
+        # V_μ(s_t) = advantage_t - v_s
+        value_mu = replay_advantages - replay_returns
+        bc_value_loss = F.mse_loss(value_s, value_mu)
 
-        total_loss = (pg_loss
+        total_loss = (policy_gradient_loss
                     + vf_coef        * value_loss
                     + ent_coef       * entropy_loss
                     + bc_policy_coef * bc_policy_loss
                     + bc_value_coef  * bc_value_loss)
 
-        return total_loss, pg_loss, value_loss, entropy_loss, bc_policy_loss, bc_value_loss
+        return total_loss, bc_policy_loss, bc_value_loss
 
 
     def learn(self) -> Dict[str, Any]:
@@ -293,17 +262,28 @@ class CLEARAgent(PPOAgent):
         # E.g. given a ratio of 50% half of the batch_size is used on the on-policy
         # rollout and the other half on the replay data
         has_replay        = len(self.replay_buffer) > 0
-        new_batch_size    = max(1, round(self.new_replay_ratio * self.batch_size))
-        replay_batch_size = self.batch_size - new_batch_size if has_replay else 0
+        # new_batch_size    = max(1, round(self.new_replay_ratio * self.batch_size))
+        # replay_batch_size = self.batch_size - new_batch_size if has_replay else 0
 
         info = {"value_loss": 0.0, "policy_loss": 0.0, "entropy": 0.0,
                 "bc_policy_loss": 0.0, "bc_value_loss": 0.0}
         losses = []
         cnt = 0
 
+        replay_rollout = self.replay_buffer.sample(gamma=self.discount_factor,
+                                                   gae_lambda=self.gae_lambda,
+                                                   n_envs=self.n_envs,
+                                                   batch_size=self.batch_size) if has_replay else None
+
+        # fallback iterator: empty iterator if replay is None
+        replay_iter = cycle(replay_rollout) if replay_rollout is not None else repeat((None, None, None, None, None, None))
+
+
         for _ in range(self.n_epochs):
-            for states, actions, old_log_probs, returns, advantages in \
-                    self.rollout_buffer.get(new_batch_size):
+            for (states, actions, old_log_probs, returns, advantages), \
+                 (rp_states, rp_actions, rp_log_probs, rp_returns,
+                  rp_advantages, rp_logits) in \
+                    zip(self.rollout_buffer.get(self.batch_size), replay_iter):
                 cnt += 1
 
                 # on-policy PPO surrogate loss
@@ -321,21 +301,17 @@ class CLEARAgent(PPOAgent):
                 )
                 total_loss = ppo_loss
 
-                # CLEAR replay losses
                 bc_policy_loss = torch.tensor(0., device=self.device)
                 bc_value_loss  = torch.tensor(0., device=self.device)
-
-                if has_replay and replay_batch_size > 0:
-                    (replay_obs, replay_next_obs, replay_actions,
-                    replay_log_probs_mu, replay_values_mu,
-                    replay_logits, replay_rewards, replay_dones) = \
-                        self.replay_buffer.sample(replay_batch_size)
-
-                    (replay_loss, r_pg, r_vl, r_ent,
-                    bc_policy_loss, bc_value_loss) = self._compute_clear_loss(
-                        replay_obs, replay_next_obs, replay_actions,
-                        replay_log_probs_mu, replay_values_mu,
-                        replay_logits, replay_rewards, replay_dones,
+                if has_replay:
+                    (replay_loss, bc_policy_loss, bc_value_loss) = self._compute_clear_loss(
+                        rp_states,
+                        rp_actions,
+                        rp_log_probs,
+                        rp_returns,
+                        rp_advantages,
+                        rp_logits,
+                        
                         self.policy,
                         self.discount_factor,
                         self.rho_bar,
@@ -343,9 +319,9 @@ class CLEARAgent(PPOAgent):
                         self.ent_coef,
                         self.bc_policy_coef,
                         self.bc_value_coef,
-                        self.discrete,
+                        self.discrete
                     )
-                    total_loss = total_loss + replay_loss
+                    total_loss += replay_loss
 
                 # gradient step
                 self.optimizer.zero_grad()

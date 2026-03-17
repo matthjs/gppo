@@ -214,8 +214,8 @@ class PPOAgent(OnPolicyAgent):
     ):
         # Policy loss
         # Note: Subtraction is division in log space.
-        ratio = torch.exp(log_probs - old_log_probs)
-        surr1 = ratio * advantages
+        ratio = torch.exp(log_probs - old_log_probs)   # [B, 1]
+        surr1 = ratio * advantages   # [B, 1]
         surr2 = torch.clamp(ratio, 1.0 - clip_range, 1.0 + clip_range) * advantages
         policy_loss = -torch.min(surr1, surr2).mean()
 
