@@ -9,17 +9,16 @@ from gppo.agents.ppoagent import PPOAgent
 from gppo.util.clearreplaybuffer import ClearReplayBuffer, dump_rollout_to_replay
 import torch
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional
 from itertools import cycle, repeat
 
 class CLEARAgent(PPOAgent):
     """
     Implementation of CLEAR with support for parallel environment execution.
     Unlike the original implementation, the standard PPO surrogate loss is used
-    for on-policy data, off-policy replay data follows the V-trace based
-    policy gradient and value function objective with policy and value cloning
-    losses.
-
+    for on-policy data and for off-policy replay data an IS-weighted GAE
+    (can be) is used instead of the V-trace algorithm with a 1-step IS-weighted
+    TD-error.
 
     Supports both continuous and discrete action spaces. For image-based observations
     (e.g. Minigrid), pass a `features_extractor_class` via `features_extractor_class`
@@ -47,13 +46,13 @@ class CLEARAgent(PPOAgent):
         vf_coef:        float = 0.5,
         max_grad_norm:  float = 0.5,
         # ── CLEAR-specific ─────────────────────────────────────────────
-        replay_buffer_capacity: int   = 500_000,
+        replay_buffer_capacity: int   = 50_000,
         new_replay_ratio:       float = 0.5,   # fraction of batch from NEW data
         bc_policy_coef:         float = 0.01,  # weight for L_policy_cloning
         bc_value_coef:          float = 0.005, # weight for L_value_cloning
         rho_bar:                float = 1.0,   # IS clip for policy gradient
-        c_bar:                  float = 1.0,   # IS clip for trace (GAE recursion)
-        use_is_gae:             bool  = True,  # use IS-weighted GAE (§3.4.2.2)
+        # c_bar:                  float = 1.0,   # IS clip for trace (GAE recursion)
+        # use_is_gae:             bool  = True,  # currently always done, not used
         # ── infrastructure ────────────────────────────────────────────
         device:         torch.device   = torch.device("cpu"),
         torch_compile:  bool           = False,
@@ -118,8 +117,8 @@ class CLEARAgent(PPOAgent):
         self.bc_policy_coef   = bc_policy_coef
         self.bc_value_coef    = bc_value_coef
         self.rho_bar          = rho_bar
-        self.c_bar            = c_bar
-        self.use_is_gae       = use_is_gae
+        # self.c_bar            = c_bar
+        # self.use_is_gae       = use_is_gae
         self.replay_buffer_capacity = replay_buffer_capacity
 
         # CLEAR replay buffer
@@ -193,7 +192,6 @@ class CLEARAgent(PPOAgent):
 
         policy,
 
-        gamma: float,
         rho_bar: float,
         vf_coef: float,
         ent_coef: float,
@@ -313,7 +311,6 @@ class CLEARAgent(PPOAgent):
                         rp_logits,
                         
                         self.policy,
-                        self.discount_factor,
                         self.rho_bar,
                         self.vf_coef,
                         self.ent_coef,

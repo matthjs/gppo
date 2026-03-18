@@ -158,11 +158,12 @@ class ClearReplayBuffer:
         """
         assert self._size > 0, "Cannot sample from an empty buffer."
 
-        # Sample indices for the unrolls to use
-        idx = torch.randint(0, self._size, (self._size,), device=self.device)
+        # Sample index for the unrolls to use
+        # idx = torch.randint(0, self._size, (self._size,), device=self.device)
+        idx = torch.randint(0, self._size, (1,), device=self.device)
 
         # Get data - stored as [capacity, unroll_len, ...]
-        # After indexing: [B, unroll_len, ...]
+        # After indexing: [1, unroll_len, ...]
         obs           = self.obs[idx]           # [B, unroll_len, *obs_shape]
         actions       = self.actions[idx]       # [B, unroll_len, *action_shape]
         rewards       = self.rewards[idx]       # [B, unroll_len]
@@ -175,7 +176,8 @@ class ClearReplayBuffer:
             actions = actions.long()
 
         # Total timesteps in the sampled data
-        total_timesteps = self._size * self.unroll_len
+        # total_timesteps = self._size * self.unroll_len
+        total_timesteps = self.unroll_len
         
         # Compute T like RolloutBuffer does: total_timesteps // n_envs
         T = total_timesteps // n_envs
@@ -183,7 +185,8 @@ class ClearReplayBuffer:
         # Flatten from [B, unroll_len, ...] to [B*unroll_len, ...]
         # This gives us the same layout as RolloutBuffer's flat storage
         def _flatten_unrolls(x):
-            return x.reshape(self._size * self.unroll_len, *x.shape[2:])
+            # return x.reshape(self._size * self.unroll_len, *x.shape[2:])
+            return x.squeeze(0)
         
         obs_flat       = _flatten_unrolls(obs)
         actions_flat   = _flatten_unrolls(actions)
