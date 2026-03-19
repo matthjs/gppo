@@ -82,7 +82,8 @@ class RolloutBuffer:
         self.values[idxs] = ensure_tensor(value, torch.float32, self.device)
         self.log_probs[idxs] = ensure_tensor(log_prob, torch.float32, self.device)
 
-        self.logits[idxs] = ensure_tensor(logits, torch.float32, self.device)
+        if self.logits is not None:
+            self.logits[idxs] = ensure_tensor(logits, torch.float32, self.device)
 
         self.pos += n_envs
 

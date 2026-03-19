@@ -53,6 +53,8 @@ class CLEARAgent(PPOAgent):
         rho_bar:                float = 1.0,   # IS clip for policy gradient
         # c_bar:                  float = 1.0,   # IS clip for trace (GAE recursion)
         # use_is_gae:             bool  = True,  # currently always done, not used
+        use_ppo_loss:           bool = True,     # use PPO surrogate loss for on-policy data
+        behavioral_cloning:     bool = True,
         # ── infrastructure ────────────────────────────────────────────
         device:         torch.device   = torch.device("cpu"),
         torch_compile:  bool           = False,
@@ -120,6 +122,8 @@ class CLEARAgent(PPOAgent):
         # self.c_bar            = c_bar
         # self.use_is_gae       = use_is_gae
         self.replay_buffer_capacity = replay_buffer_capacity
+        self.use_ppo_loss = use_ppo_loss
+        self.behavioral_cloning = behavioral_cloning
 
         # CLEAR replay buffer
         action_dim = int(np.prod(action_dimensions))
@@ -197,7 +201,8 @@ class CLEARAgent(PPOAgent):
         ent_coef: float,
         bc_policy_coef: float,
         bc_value_coef: float,
-        discrete: bool
+        discrete: bool,
+        behavioral_cloning: bool = True
     ) -> tuple:
         # get forward pass
         dist_s, value_s, _ = policy(replay_obs)
@@ -225,29 +230,31 @@ class CLEARAgent(PPOAgent):
         entropy_loss = -(ent.mean() if ent.dim() == 1 else ent.sum(dim=-1).mean())
 
         # L_policy-cloning = KL[μ ‖ π_θ] (replay only)
-        if discrete:
-            # Full KL using stored logits of μ
-            # KL(μ‖π_θ) = Σ_a μ(a)[log μ(a) − log π_θ(a)]
-            log_mu = replay_logits - torch.logsumexp(replay_logits, dim=-1, keepdim=True)
-            log_pi = dist_s.logits    - torch.logsumexp(dist_s.logits,    dim=-1, keepdim=True)
-            mu_probs = log_mu.exp()
-            bc_policy_loss = (mu_probs * (log_mu - log_pi)).sum(dim=-1).mean()
-        else:
-            bc_policy_loss = F.mse_loss(log_prob, replay_log_probs_mu.detach())
+        if behavioral_cloning:
+            if discrete:
+                # Full KL using stored logits of μ
+                # KL(μ‖π_θ) = Σ_a μ(a)[log μ(a) − log π_θ(a)]
+                log_mu = replay_logits - torch.logsumexp(replay_logits, dim=-1, keepdim=True)
+                log_pi = dist_s.logits    - torch.logsumexp(dist_s.logits,    dim=-1, keepdim=True)
+                mu_probs = log_mu.exp()
+                bc_policy_loss = (mu_probs * (log_mu - log_pi)).sum(dim=-1).mean()
+            else:
+                bc_policy_loss = F.mse_loss(log_prob, replay_log_probs_mu.detach())
 
-        # L_value-cloning = ‖V_θ(s) − V_μ(s)‖² (replay only)
-        # Hacky way of reconstructing historical value
-        # V_μ(s_t) = advantage_t - v_s
-        value_mu = replay_advantages - replay_returns
-        bc_value_loss = F.mse_loss(value_s, value_mu)
+            # L_value-cloning = ‖V_θ(s) − V_μ(s)‖² (replay only)
+            # Hacky way of reconstructing historical value
+            # V_μ(s_t) = advantage_t - v_s
+            value_mu = replay_advantages - replay_returns
+            bc_value_loss = F.mse_loss(value_s, value_mu)
 
         total_loss = (policy_gradient_loss
                     + vf_coef        * value_loss
-                    + ent_coef       * entropy_loss
-                    + bc_policy_coef * bc_policy_loss
-                    + bc_value_coef  * bc_value_loss)
+                    + ent_coef       * entropy_loss)
+        if behavioral_cloning:
+            total_loss += bc_policy_coef * bc_policy_loss + bc_value_coef  * bc_value_loss
 
-        return total_loss, bc_policy_loss, bc_value_loss
+        return total_loss, bc_policy_loss if behavioral_cloning else None, bc_value_loss if behavioral_cloning else None, \
+              policy_gradient_loss, value_loss, entropy_loss
 
 
     def learn(self) -> Dict[str, Any]:
@@ -284,25 +291,46 @@ class CLEARAgent(PPOAgent):
                     zip(self.rollout_buffer.get(self.batch_size), replay_iter):
                 cnt += 1
 
-                # on-policy PPO surrogate loss
-                dist, values, _ = self.policy(states)
-                _actions = actions.squeeze(-1) if self.discrete else actions
-                lp = dist.log_prob(_actions)
-                log_probs    = (lp if lp.dim() == 1 else lp.sum(dim=-1)).unsqueeze(-1)
-                entropy_loss = (-dist.entropy().mean() if self.discrete
-                                else -dist.entropy().sum(dim=-1).mean())
+                total_loss = None
+                if self.use_ppo_loss:
+                    # on-policy PPO surrogate loss
+                    dist, values, _ = self.policy(states)
+                    _actions = actions.squeeze(-1) if self.discrete else actions
+                    lp = dist.log_prob(_actions)
+                    log_probs    = (lp if lp.dim() == 1 else lp.sum(dim=-1)).unsqueeze(-1)
+                    entropy_loss = (-dist.entropy().mean() if self.discrete
+                                    else -dist.entropy().sum(dim=-1).mean())
 
-                ppo_loss, policy_loss, value_loss = self._compute_ppo_loss(
-                    log_probs, old_log_probs, advantages, returns,
-                    values, self.clip_range, self.vf_coef,
-                    self.ent_coef, entropy_loss,
-                )
-                total_loss = ppo_loss
+                    ppo_loss, policy_loss, value_loss = self._compute_ppo_loss(
+                        log_probs, old_log_probs, advantages, returns,
+                        values, self.clip_range, self.vf_coef,
+                        self.ent_coef, entropy_loss,
+                    )
+                    total_loss = ppo_loss
+                else:
+                    (loss, _, _, policy_loss, value_loss, entropy_loss) = self._compute_clear_loss(
+                        states,
+                        actions,
+                        old_log_probs,
+                        returns,
+                        advantages,
+                        None,
+
+                        self.policy,
+                        self.rho_bar,
+                        self.vf_coef,
+                        self.ent_coef,
+                        self.bc_policy_coef,
+                        self.bc_value_coef,
+                        self.discrete,
+                        behavioral_cloning=False
+                    )
+                    total_loss = loss
 
                 bc_policy_loss = torch.tensor(0., device=self.device)
                 bc_value_loss  = torch.tensor(0., device=self.device)
                 if has_replay:
-                    (replay_loss, bc_policy_loss, bc_value_loss) = self._compute_clear_loss(
+                    (replay_loss, bc_policy_loss, bc_value_loss, _, _, _) = self._compute_clear_loss(
                         rp_states,
                         rp_actions,
                         rp_log_probs,
@@ -316,7 +344,8 @@ class CLEARAgent(PPOAgent):
                         self.ent_coef,
                         self.bc_policy_coef,
                         self.bc_value_coef,
-                        self.discrete
+                        self.discrete,
+                        behavioral_cloning=self.behavioral_cloning
                     )
                     total_loss += replay_loss
 
@@ -330,8 +359,8 @@ class CLEARAgent(PPOAgent):
                 info["value_loss"]     += value_loss.item()
                 info["policy_loss"]    += policy_loss.item()
                 info["entropy"]        += -entropy_loss.item()
-                info["bc_policy_loss"] += bc_policy_loss.item()
-                info["bc_value_loss"]  += bc_value_loss.item()
+                info["bc_policy_loss"] += bc_policy_loss.item() if bc_policy_loss is not None else 0.0
+                info["bc_value_loss"]  += bc_value_loss.item() if bc_value_loss is not None else 0.0
 
         dump_rollout_to_replay(self.rollout_buffer, self.replay_buffer)
         self.rollout_buffer.clear()
@@ -341,28 +370,59 @@ class CLEARAgent(PPOAgent):
             info[k] /= cnt
         return info
 
-
     def save(self, path: str) -> None:
+        s = self.replay_buffer._size
         torch.save({
             'model_state_dict': self.policy.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
+            'replay_buffer': {
+                'obs':           self.replay_buffer.obs[:s].cpu(),
+                'next_obs_last': self.replay_buffer.next_obs_last[:s].cpu(),
+                'actions':       self.replay_buffer.actions[:s].cpu(),
+                'rewards':       self.replay_buffer.rewards[:s].cpu(),
+                'dones':         self.replay_buffer.dones[:s].cpu(),
+                'log_probs':     self.replay_buffer.log_probs[:s].cpu(),
+                'values':        self.replay_buffer.values[:s].cpu(),
+                'logits':        self.replay_buffer.logits[:s].cpu(),
+                '_size':         s,
+                '_total_seen':   self.replay_buffer._total_seen,
+            },
             'hyperparameters': {
-                'state_dimensions': self.state_dimensions,
-                'action_dimensions': self.action_dimensions,
-                'learning_rate': self.learning_rate,
-                'n_steps': self.n_steps,
-                'n_envs': self.n_envs,
-                'n_epochs': self.n_epochs,
-                'gae_lambda': self.gae_lambda,
-                'clip_range': self.clip_range,
-                'ent_coef': self.ent_coef,
-                'vf_coef': self.vf_coef,
-                'max_grad_norm': self.max_grad_norm,
+                'state_dimensions':       self.state_dimensions,
+                'action_dimensions':      self.action_dimensions,
+                'learning_rate':          self.learning_rate,
+                'n_steps':                self.n_steps,
+                'n_envs':                 self.n_envs,
+                'n_epochs':               self.n_epochs,
+                'gae_lambda':             self.gae_lambda,
+                'clip_range':             self.clip_range,
+                'ent_coef':               self.ent_coef,
+                'vf_coef':                self.vf_coef,
+                'max_grad_norm':          self.max_grad_norm,
+                'replay_buffer_capacity': self.replay_buffer_capacity,
+                'new_replay_ratio':       self.new_replay_ratio,
+                'bc_policy_coef':         self.bc_policy_coef,
+                'bc_value_coef':          self.bc_value_coef,
+                'rho_bar':                self.rho_bar,
             }
         }, path)
+
 
     def load(self, path: str) -> None:
         checkpoint = torch.load(path, map_location=self.device, weights_only=False)
         self.policy.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
+        if 'replay_buffer' in checkpoint:
+            rb = checkpoint['replay_buffer']
+            s = rb['_size']
+            self.replay_buffer.obs[:s]           = rb['obs'].to(self.device)
+            self.replay_buffer.next_obs_last[:s] = rb['next_obs_last'].to(self.device)
+            self.replay_buffer.actions[:s]       = rb['actions'].to(self.device)
+            self.replay_buffer.rewards[:s]       = rb['rewards'].to(self.device)
+            self.replay_buffer.dones[:s]         = rb['dones'].to(self.device)
+            self.replay_buffer.log_probs[:s]     = rb['log_probs'].to(self.device)
+            self.replay_buffer.values[:s]        = rb['values'].to(self.device)
+            self.replay_buffer.logits[:s]        = rb['logits'].to(self.device)
+            self.replay_buffer._size             = s
+            self.replay_buffer._total_seen       = rb['_total_seen']
