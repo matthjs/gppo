@@ -38,6 +38,7 @@ class RolloutBuffer:
         self.advantages = torch.zeros(capacity, dtype=torch.float32, device=device)
         self.returns = torch.zeros(capacity, dtype=torch.float32, device=device)
         self.logits = None   # if needed
+        self.next_obs = None  # if needed
 
     def set_logit_buffer(self, dim: int) -> None:
         """
@@ -55,7 +56,8 @@ class RolloutBuffer:
         done: Union[Tensor, np.ndarray],
         log_prob: Union[Tensor, np.ndarray] = None,
         value: Union[Tensor, np.ndarray] = None,
-        logits: Union[Tensor, np.ndarray] = None
+        logits: Union[Tensor, np.ndarray] = None,
+        next_obs: Union[Tensor, np.ndarray] = None
     ) -> None:
         """
         Add a transition to the buffer.
@@ -84,6 +86,8 @@ class RolloutBuffer:
 
         if self.logits is not None:
             self.logits[idxs] = ensure_tensor(logits, torch.float32, self.device)
+        if self.next_obs is not None:
+            self.next_obs[idxs] = ensure_tensor(next_obs, torch.float32, self.device)
 
         self.pos += n_envs
 

@@ -39,8 +39,7 @@ class ClearReplayBuffer:
         log_probs    [unroll_len]                    log μ(a_t | s_t)
         values       [unroll_len]                    V_μ(s_t)
         logits       [unroll_len, action_dim]        raw logits of μ  (discrete)
-        next_obs_last [*obs_shape]                   s_T  — bootstrap obs after
-                                                     the final step of the unroll
+        next_obs     [unroll_len, *obs_shape]        s_{t+1} for each timestep
     """
 
     def __init__(
@@ -49,6 +48,7 @@ class ClearReplayBuffer:
         obs_shape:    Tuple[int, ...],
         action_shape: Tuple[int, ...],
         unroll_len:   int,
+        n_envs:       int,
         action_dim:   int,           # number of discrete actions; 0 for continuous
         discrete:     bool,
         device:       torch.device,
@@ -68,6 +68,7 @@ class ClearReplayBuffer:
         self.device     = device
         self.action_dim = action_dim
         self.discrete   = discrete
+        self.n_envs = n_envs
 
         self._size:       int = 0   # number of valid unroll slots
         self._total_seen: int = 0   # total unrolls pushed (for reservoir)
@@ -75,9 +76,8 @@ class ClearReplayBuffer:
         # pre-allocate storage
         self.obs       = torch.zeros(
             (capacity, unroll_len, *    obs_shape),    dtype=torch.float32, device=device)
-        self.next_obs_last = torch.zeros(
-            (capacity, *obs_shape),                dtype=torch.float32, device=device)
-
+        self.next_obs = torch.zeros(
+            (capacity, unroll_len, *obs_shape), dtype=torch.float32, device=device)
         _action_shape = (1,) if discrete else action_shape
         self.actions   = torch.zeros(
             (capacity, unroll_len, *_action_shape), dtype=torch.float32, device=device)
@@ -93,7 +93,7 @@ class ClearReplayBuffer:
     def push(
         self,
         obs:           torch.Tensor,            # [T, *obs_shape]
-        next_obs_last: torch.Tensor,            # [*obs_shape]
+        next_obs: torch.Tensor,                 # [T, *obs_shape]
         actions:       torch.Tensor,            # [T, *action_shape]
         rewards:       torch.Tensor,            # [T]
         dones:         torch.Tensor,            # [T]
@@ -120,23 +120,22 @@ class ClearReplayBuffer:
                 return          # discard — keeps buffer a uniform random sample
             idx = j
 
-        self.obs[idx]            = _to_tensor(obs,           torch.float32, self.device)
-        self.next_obs_last[idx]  = _to_tensor(next_obs_last, torch.float32, self.device)
-        self.rewards[idx]        = _to_tensor(rewards,       torch.float32, self.device)
-        self.dones[idx]          = _to_tensor(dones,         torch.float32, self.device)
-        self.log_probs[idx]      = _to_tensor(log_probs,     torch.float32, self.device)
-        self.values[idx]         = _to_tensor(values,        torch.float32, self.device)
+        self.obs[idx]       = _to_tensor(obs,      torch.float32, self.device)
+        self.next_obs[idx]  = _to_tensor(next_obs, torch.float32, self.device)
+        self.rewards[idx]   = _to_tensor(rewards,  torch.float32, self.device)
+        self.dones[idx]     = _to_tensor(dones,    torch.float32, self.device)
+        self.log_probs[idx] = _to_tensor(log_probs,torch.float32, self.device)
+        self.values[idx]    = _to_tensor(values,   torch.float32, self.device)
 
         act = _to_tensor(actions, torch.float32, self.device)
-        # if self.discrete:
-        #    act = act.view(self.unroll_len, 1)
         self.actions[idx] = act
 
         if logits is not None:
             self.logits[idx] = _to_tensor(logits, torch.float32, self.device)
         # else: logits slot stays zero (harmless for continuous; never used for KL)
 
-    def sample(self, gamma: float, gae_lambda: float, n_envs: int = 1,
+    def sample(self, policy,
+               gamma: float, gae_lambda: float, n_envs: int = 1,
                batch_size: int = 1) -> Generator:
         """
         Sample all stored unrolls, compute GAE, then yield mini-batches.
@@ -155,16 +154,16 @@ class ClearReplayBuffer:
         returns      [batch_size, 1]
         advantages   [batch_size, 1]
         logits       [batch_size, action_dim]
+        values_mu    [batch_size, 1]             stored V_μ(s) for bc_value_loss
         """
         assert self._size > 0, "Cannot sample from an empty buffer."
 
-        # Sample index for the unrolls to use
-        # idx = torch.randint(0, self._size, (self._size,), device=self.device)
         idx = torch.randint(0, self._size, (1,), device=self.device)
 
         # Get data - stored as [capacity, unroll_len, ...]
         # After indexing: [1, unroll_len, ...]
         obs           = self.obs[idx]           # [B, unroll_len, *obs_shape]
+        next_obs      = self.next_obs[idx]      # [B, unroll_len, *obs_shape]
         actions       = self.actions[idx]       # [B, unroll_len, *action_shape]
         rewards       = self.rewards[idx]       # [B, unroll_len]
         dones         = self.dones[idx]         # [B, unroll_len]
@@ -175,64 +174,58 @@ class ClearReplayBuffer:
         if self.discrete:
             actions = actions.long()
 
-        # Total timesteps in the sampled data
-        # total_timesteps = self._size * self.unroll_len
         total_timesteps = self.unroll_len
-        
-        # Compute T like RolloutBuffer does: total_timesteps // n_envs
         T = total_timesteps // n_envs
-        
-        # Flatten from [B, unroll_len, ...] to [B*unroll_len, ...]
-        # This gives us the same layout as RolloutBuffer's flat storage
+
         def _flatten_unrolls(x):
-            # return x.reshape(self._size * self.unroll_len, *x.shape[2:])
             return x.squeeze(0)
-        
-        obs_flat       = _flatten_unrolls(obs)
+
+        obs_flat       = _flatten_unrolls(obs)        # [T*n_envs, *obs_shape]
+        next_obs_flat  = _flatten_unrolls(next_obs)   # [T*n_envs, *obs_shape]
         actions_flat   = _flatten_unrolls(actions)
         rewards_flat   = _flatten_unrolls(rewards)
         dones_flat     = _flatten_unrolls(dones)
         values_flat    = _flatten_unrolls(values)
         log_probs_flat = _flatten_unrolls(log_probs)
         logits_flat    = _flatten_unrolls(logits)
-        
+
         # Now reshape into [T, n_envs] like RolloutBuffer does
-        rewards_reshaped = rewards_flat.view(T, n_envs)
-        dones_reshaped   = dones_flat.view(T, n_envs)
-        values_reshaped  = values_flat.view(T, n_envs)
-        
-        # Bootstrap with last value for each env
-        last_value = values_reshaped[-1]  # [n_envs]
-        
-        # Extend values and dones
-        values_ext = torch.cat([values_reshaped, last_value.unsqueeze(0)], dim=0)  # [T+1, n_envs]
-        dones_ext  = torch.cat([dones_reshaped, torch.zeros(1, n_envs, device=self.device)], dim=0)
-        
+        rewards_reshaped  = rewards_flat.view(T, n_envs)
+        dones_reshaped    = dones_flat.view(T, n_envs)
+
+        # Recompute values with current critic
+        with torch.no_grad():
+            _, values_current, _ = policy(obs_flat)       # [T*n_envs]
+            _, next_values, _    = policy(next_obs_flat)  # [T*n_envs]
+
+        values_reshaped      = values_current.view(T, n_envs)
+        next_values_reshaped = next_values.view(T, n_envs)
+
         advantages = torch.zeros(T, n_envs, device=self.device)
         gae        = torch.zeros(n_envs, device=self.device)
-        
-        # Compute GAE backwards like RolloutBuffer
+
+        # Compute GAE: δt = rt + γV(st+1) - V(st)
         for t in reversed(range(T)):
             delta = (
                 rewards_reshaped[t]
-                + gamma * values_ext[t + 1] * (1.0 - dones_ext[t])
-                - values_ext[t]
+                + gamma * next_values_reshaped[t] * (1.0 - dones_reshaped[t])
+                - values_reshaped[t]
             )
-            gae = delta + gamma * gae_lambda * (1.0 - dones_ext[t]) * gae
+            gae = delta + gamma * gae_lambda * (1.0 - dones_reshaped[t]) * gae
             advantages[t] = gae
-        
+
         returns = advantages + values_reshaped
-        
+
         # Flatten back to match buffer layout
         advantages_flat_final = advantages.view(-1)
         returns_flat_final    = returns.view(-1)
-        
+
         # Normalize advantages
-        advantages_flat_final = (
-            (advantages_flat_final - advantages_flat_final.mean()) / 
-            (advantages_flat_final.std() + 1e-8)
-        )
-        
+        # advantages_flat_final = (
+        #    (advantages_flat_final - advantages_flat_final.mean()) /
+        #    (advantages_flat_final.std() + 1e-8)
+        # )
+
         # Shuffle and yield mini-batches
         indices = torch.randperm(total_timesteps, device=self.device)
         for i in range(0, total_timesteps, batch_size):
@@ -244,6 +237,7 @@ class ClearReplayBuffer:
                 returns_flat_final[batch_idx].unsqueeze(-1),
                 advantages_flat_final[batch_idx].unsqueeze(-1),
                 logits_flat[batch_idx] if self.discrete else None,
+                values_flat[batch_idx].unsqueeze(-1),   # stored V_μ(s) for bc_value_loss
             )
 
     def __len__(self) -> int:
@@ -284,26 +278,23 @@ def dump_rollout_to_replay(
     log_probs = rollout.log_probs[:n_complete]  # [n_complete]
     logits    = rollout.logits[:n_complete] if rollout.logits is not None else None
 
+    # derive next_obs by shifting obs by n_envs steps
+    n_envs   = replay.n_envs
+    next_obs = torch.cat([obs[n_envs:], torch.zeros_like(obs[:n_envs])], dim=0)  # [n_complete, *obs_shape]
+
     num_unrolls = n_complete // T
 
-    # This will typically be num_unrolls=1
     for i in range(num_unrolls):
         start = i * T
         end   = start + T
 
-        # Bootstrap obs: first obs of the next unroll, or zeros at boundary
-        if end < n:
-            next_obs_last = obs[end]
-        else:
-            next_obs_last = torch.zeros_like(obs[0])
-
         replay.push(
-            obs           = obs[start:end],
-            next_obs_last = next_obs_last,
-            actions       = actions[start:end],
-            rewards       = rewards[start:end],
-            dones         = dones[start:end],
-            log_probs     = log_probs[start:end],
-            values        = values[start:end],
-            logits        = logits[start:end] if logits is not None else None,
+            obs       = obs[start:end],
+            next_obs  = next_obs[start:end],
+            actions   = actions[start:end],
+            rewards   = rewards[start:end],
+            dones     = dones[start:end],
+            log_probs = log_probs[start:end],
+            values    = values[start:end],
+            logits    = logits[start:end] if logits is not None else None,
         )

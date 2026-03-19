@@ -138,6 +138,7 @@ class CLEARAgent(PPOAgent):
             # Each unroll will be the amount in the replaybuffer before
             # clear
             unroll_len=self.rollout_buffer.capacity,   # n_envs * n_steps !
+            n_envs=self.n_envs,
             action_dim=action_dim if discrete else 0,   # --> for later, means do not allocate logits array
             discrete=discrete,
             device=device,
@@ -182,7 +183,8 @@ class CLEARAgent(PPOAgent):
             done,
             self.last_log_prob.detach(),
             self.last_value.detach(),
-            self.last_logits.detach() if self.discrete else None   # <--- added
+            self.last_logits.detach() if self.discrete else None,   # <--- added
+            self.next_state
         )
 
     @staticmethod
@@ -193,6 +195,7 @@ class CLEARAgent(PPOAgent):
         replay_returns: torch.Tensor,
         replay_advantages: torch.Tensor,
         replay_logits: torch.Tensor,
+        replay_values_mu: torch.Tensor,
 
         policy,
 
@@ -244,7 +247,7 @@ class CLEARAgent(PPOAgent):
             # L_value-cloning = ‖V_θ(s) − V_μ(s)‖² (replay only)
             # Hacky way of reconstructing historical value
             # V_μ(s_t) = advantage_t - v_s
-            value_mu = replay_advantages - replay_returns
+            value_mu = replay_values_mu # replay_returns - replay_advantages  # replay_advantages - replay_returns
             bc_value_loss = F.mse_loss(value_s, value_mu)
 
         total_loss = (policy_gradient_loss
@@ -275,19 +278,20 @@ class CLEARAgent(PPOAgent):
         losses = []
         cnt = 0
 
-        replay_rollout = self.replay_buffer.sample(gamma=self.discount_factor,
+        replay_rollout = self.replay_buffer.sample(policy=self.policy,
+                                                   gamma=self.discount_factor,
                                                    gae_lambda=self.gae_lambda,
                                                    n_envs=self.n_envs,
                                                    batch_size=self.batch_size) if has_replay else None
 
         # fallback iterator: empty iterator if replay is None
-        replay_iter = cycle(replay_rollout) if replay_rollout is not None else repeat((None, None, None, None, None, None))
+        replay_iter = cycle(replay_rollout) if replay_rollout is not None else repeat((None, None, None, None, None, None, None))
 
 
         for _ in range(self.n_epochs):
             for (states, actions, old_log_probs, returns, advantages), \
                  (rp_states, rp_actions, rp_log_probs, rp_returns,
-                  rp_advantages, rp_logits) in \
+                  rp_advantages, rp_logits, rp_value_mu) in \
                     zip(self.rollout_buffer.get(self.batch_size), replay_iter):
                 cnt += 1
 
@@ -337,6 +341,7 @@ class CLEARAgent(PPOAgent):
                         rp_returns,
                         rp_advantages,
                         rp_logits,
+                        rp_value_mu,
                         
                         self.policy,
                         self.rho_bar,
@@ -377,7 +382,7 @@ class CLEARAgent(PPOAgent):
             'optimizer_state_dict': self.optimizer.state_dict(),
             'replay_buffer': {
                 'obs':           self.replay_buffer.obs[:s].cpu(),
-                'next_obs_last': self.replay_buffer.next_obs_last[:s].cpu(),
+                'next_obs':      self.replay_buffer.next_obs[:s].cpu(),
                 'actions':       self.replay_buffer.actions[:s].cpu(),
                 'rewards':       self.replay_buffer.rewards[:s].cpu(),
                 'dones':         self.replay_buffer.dones[:s].cpu(),
@@ -407,22 +412,20 @@ class CLEARAgent(PPOAgent):
             }
         }, path)
 
-
     def load(self, path: str) -> None:
         checkpoint = torch.load(path, map_location=self.device, weights_only=False)
         self.policy.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
         if 'replay_buffer' in checkpoint:
             rb = checkpoint['replay_buffer']
             s = rb['_size']
-            self.replay_buffer.obs[:s]           = rb['obs'].to(self.device)
-            self.replay_buffer.next_obs_last[:s] = rb['next_obs_last'].to(self.device)
-            self.replay_buffer.actions[:s]       = rb['actions'].to(self.device)
-            self.replay_buffer.rewards[:s]       = rb['rewards'].to(self.device)
-            self.replay_buffer.dones[:s]         = rb['dones'].to(self.device)
-            self.replay_buffer.log_probs[:s]     = rb['log_probs'].to(self.device)
-            self.replay_buffer.values[:s]        = rb['values'].to(self.device)
-            self.replay_buffer.logits[:s]        = rb['logits'].to(self.device)
-            self.replay_buffer._size             = s
-            self.replay_buffer._total_seen       = rb['_total_seen']
+            self.replay_buffer.obs[:s]       = rb['obs'].to(self.device)
+            self.replay_buffer.next_obs[:s]  = rb['next_obs'].to(self.device)
+            self.replay_buffer.actions[:s]   = rb['actions'].to(self.device)
+            self.replay_buffer.rewards[:s]   = rb['rewards'].to(self.device)
+            self.replay_buffer.dones[:s]     = rb['dones'].to(self.device)
+            self.replay_buffer.log_probs[:s] = rb['log_probs'].to(self.device)
+            self.replay_buffer.values[:s]    = rb['values'].to(self.device)
+            self.replay_buffer.logits[:s]    = rb['logits'].to(self.device)
+            self.replay_buffer._size         = s
+            self.replay_buffer._total_seen   = rb['_total_seen']
