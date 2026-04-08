@@ -163,6 +163,9 @@ class AgentFactory:
                     extractor_cls = _locate(extractor_cls["_target_"])
                 agent_params["features_extractor_class"] = extractor_cls
                 agent_params["features_extractor_kwargs"] = policy_kwargs.get("features_extractor_kwargs", {})
+
+            if optimizer_cfg:
+                agent_params["optimizer_cfg"] = optimizer_cfg
             agent = PPOAgent(**agent_params)
         elif agent_type == "GPPO":
             agent_params.update({

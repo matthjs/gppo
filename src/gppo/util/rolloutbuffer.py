@@ -40,6 +40,9 @@ class RolloutBuffer:
         self.logits = None   # if needed
         self.next_obs = None  # if needed
 
+    def is_full(self) -> bool:
+        return len(self.rollout_buffer) >= self.rollout_buffer.capacity
+
     def set_logit_buffer(self, dim: int) -> None:
         """
         This only makes sense for discrete actions and is used with the CLEAR algorithm

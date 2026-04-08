@@ -28,6 +28,12 @@ class OnPolicyAgent(Agent, ABC):
         self.discount_factor = discount_factor
         self.device = device
 
+    def clear(self) -> None:
+        """
+        Specify how the rolloutbuffer should be cleared at the end of an learning update
+        """
+        self.rollout_buffer.clear()
+
     # Implement store_transition() in child class
 
     # Implement choose_action() in child class

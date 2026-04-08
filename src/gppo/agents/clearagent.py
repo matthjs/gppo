@@ -367,13 +367,16 @@ class CLEARAgent(PPOAgent):
                 info["bc_policy_loss"] += bc_policy_loss.item() if bc_policy_loss is not None else 0.0
                 info["bc_value_loss"]  += bc_value_loss.item() if bc_value_loss is not None else 0.0
 
-        dump_rollout_to_replay(self.rollout_buffer, self.replay_buffer)
-        self.rollout_buffer.clear()
+        self.clear()
 
         info["loss"] = float(np.mean(losses))
         for k in ("value_loss", "policy_loss", "entropy", "bc_policy_loss", "bc_value_loss"):
             info[k] /= cnt
         return info
+    
+    def clear(self) -> None:
+        dump_rollout_to_replay(self.rollout_buffer, self.replay_buffer)
+        self.rollout_buffer.clear()
 
     def save(self, path: str) -> None:
         s = self.replay_buffer._size

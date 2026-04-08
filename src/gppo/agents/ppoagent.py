@@ -44,6 +44,7 @@ class PPOAgent(OnPolicyAgent):
             features_extractor_class=None,
             features_extractor_kwargs: dict = None,
             discrete: bool = False,
+            disable_clipping: bool = False,
             **kwargs
     ):
         """
@@ -90,6 +91,7 @@ class PPOAgent(OnPolicyAgent):
             device,
         )
 
+        self.disable_clipping = disable_clipping
         self.n_steps = n_steps
         self.n_envs = n_envs
         self.discrete = discrete  # store on agent directly — policy may be wrapped by torch.compile
@@ -124,7 +126,12 @@ class PPOAgent(OnPolicyAgent):
         self.optimizer = None
         if optimizer_cfg:
             cls, kwargs = resolve_optimizer_cls(optimizer_cfg)
-            self.optimizer = cls(self.policy.parameters(), **kwargs)
+            try:
+                self.optimizer = cls(self.policy.parameters(), **kwargs)
+            except AttributeError:
+                # Some optimizers (e.g. NCL) require the full model rather than
+                # an iterator of parameters — fall back to passing the module itself.
+                self.optimizer = cls(self.policy, **kwargs)
         else:
             self.optimizer = torch.optim.Adam(self.policy.parameters(),
                                 lr=self.learning_rate)
@@ -280,7 +287,7 @@ class PPOAgent(OnPolicyAgent):
                     self.policy.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
-        self.rollout_buffer.clear()
+        self.clear()   # clears rollout_buffer
         info["loss"] = float(np.mean(losses))
         info["value_loss"] = info["value_loss"] / cnt
         info["policy_loss"] = info["policy_loss"] / cnt
