@@ -111,8 +111,10 @@ class BayesianOptimizer:
             self.trail_scores[trial_idx] = metrics[self.objective_name]
 
         best = self.get_best_parameters()
-        max_key = max(self.trail_scores, key=self.trail_scores.get)
-        print(f"Best trial {max_key} with {self.objective_name}: {self.trail_scores[max_key]}")
+        best_key = (min if self.minimize else max)(
+            self.trail_scores, key=self.trail_scores.get
+        )
+        print(f"Best trial {best_key} with {self.objective_name}: {self.trail_scores[best_key]}")
         if self.logger and self.save_path:
             os.makedirs(self.save_path, exist_ok=True)
             path = os.path.join(self.save_path, "best_hyperparams.json")

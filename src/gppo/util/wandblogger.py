@@ -9,6 +9,7 @@ class WandbLogger:
     """
     Wrapper for Weights & Biases (wandb) logging with optional metric tracking.
     """
+
     def __init__(
             self,
             enable: bool = True,
@@ -42,7 +43,7 @@ class WandbLogger:
         self.metrics_tracker = metrics_tracker
         self.run = None
         self.runs = 0
-        # self.start()
+        self.start()
 
     def start(self) -> None:
         """
@@ -102,7 +103,8 @@ class WandbLogger:
 
         if self.metrics_tracker:
             for key, value in metrics.items():
-                self.metrics_tracker.record_metric(key, agent_id, episode, value)
+                self.metrics_tracker.record_metric(
+                    key, agent_id, episode, value)
 
     def save(self, filepath: str) -> None:
         """
@@ -125,9 +127,11 @@ class WandbLogger:
         if self.metrics_tracker and self.enabled:
             self.metrics_tracker.plot_all_metrics(num_episodes)
             save_path = self.metrics_tracker.save_path
-            metrics_path = os.path.join(save_path, "metrics.json")   # Also kind of sketchy
+            metrics_path = os.path.join(
+                save_path, "metrics.json")   # Also kind of sketchy
             for metric_name in self.metrics_tracker.metrics_history.keys():
-                self.log_image(metric_name, str(os.path.join(save_path, metric_name)) + ".png")
+                self.log_image(metric_name, str(
+                    os.path.join(save_path, metric_name)) + ".png")
                 self.save(str(os.path.join(save_path, metric_name)) + ".svg")
 
             if export_metrics:
