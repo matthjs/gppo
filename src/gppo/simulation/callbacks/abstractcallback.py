@@ -23,7 +23,7 @@ class AbstractCallback(ABC):
     def init_callback(self, data: SimulatorRLData) -> None:
         pass
 
-    def on_step(self, action, reward, next_obs, done) -> bool:
+    def on_step(self, action, reward, next_obs, done, info=None) -> bool:
         """
         Callback for each step of the environment.
 

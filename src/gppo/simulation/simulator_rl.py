@@ -173,7 +173,8 @@ class SimulatorRL:
                                             action=actions,
                                             reward=rewards,
                                             next_obs=next_obs,
-                                            done=dones):
+                                            done=dones,
+                                            info=infos):
                     break
 
                 self.agent.store_transition(
