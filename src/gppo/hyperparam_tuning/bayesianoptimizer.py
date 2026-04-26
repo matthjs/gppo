@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional
 from ax.service.utils.instantiation import ObjectiveProperties
 from gppo.agents.agent import Agent
 from gppo.util.wandblogger import WandbLogger
+from tqdm import tqdm
 import warnings
 
 # Suppress only RuntimeWarnings from BoTorch
@@ -76,6 +77,7 @@ class BayesianOptimizer:
             name="bayesian_optimization",
             parameters=search_space,
             objectives={self.objective_name: ObjectiveProperties(minimize=self.minimize)},
+            tracking_metric_names=list(tracking_metrics) if tracking_metrics else [],
         )
 
         self.logger = wandb_logger
@@ -97,18 +99,41 @@ class BayesianOptimizer:
 
     def optimize(self, n_trials: int = 50) -> Dict[str, Any]:
         """Main optimization loop"""
-        for _ in range(n_trials):
-            # Get suggested hyperparameter values.
+        best_so_far: Optional[float] = None
+        cmp = min if self.minimize else max
+
+        bar = tqdm(
+            range(n_trials),
+            desc="BO trials",
+            unit="trial",
+            dynamic_ncols=True,
+        )
+        for _ in bar:
             params, trial_idx = self.ax_client.get_next_trial()
             metrics = self.run_trial(params)
 
-            # Report primary metric to Ax
+            raw_data: Dict[str, Tuple[float, None]] = {
+                self.objective_name: (metrics[self.objective_name], None)
+            }
+            if self.tracking_metrics:
+                for m in self.tracking_metrics:
+                    if m in metrics and m != self.objective_name:
+                        raw_data[m] = (metrics[m], None)
             self.ax_client.complete_trial(
                 trial_index=trial_idx,
-                raw_data=metrics[self.objective_name]
+                raw_data=raw_data
             )
 
-            self.trail_scores[trial_idx] = metrics[self.objective_name]
+            score = metrics[self.objective_name]
+            self.trail_scores[trial_idx] = score
+
+            if best_so_far is None or score == cmp(score, best_so_far):
+                best_so_far = score
+
+            bar.set_postfix({
+                self.objective_name: f"{score:.4f}",
+                f"best_{self.objective_name}": f"{best_so_far:.4f}",
+            })
 
         best = self.get_best_parameters()
         best_key = (min if self.minimize else max)(
